@@ -70,46 +70,46 @@ Produce a fully commented `EDA.ipynb` notebook exploring all data sources, ident
 ### Tasks
 
 **Target Variable Analysis**
-- [ ] Compute class distribution of TARGET — quantify imbalance ratio (expected: ~8–10% default rate)
-- [ ] Document the precise definition: late payment > X days on first Y installments
+- [x] Compute class distribution of TARGET — quantify imbalance ratio (expected: ~8–10% default rate)
+- [x] Document the precise definition: late payment > X days on first Y installments
 
 **Application Table (`application_train.csv`)**
-- [ ] Distribution plots for key numeric features: `AMT_INCOME_TOTAL`, `AMT_CREDIT`, `AMT_ANNUITY`, `DAYS_BIRTH`, `DAYS_EMPLOYED`
-- [ ] Default rate by categorical variables: `NAME_CONTRACT_TYPE`, `NAME_INCOME_TYPE`, `NAME_EDUCATION_TYPE`, `NAME_HOUSING_TYPE`, `OCCUPATION_TYPE`
-- [ ] Analyse the 3 `EXT_SOURCE` features — correlation with TARGET, pairwise correlation between sources
-- [ ] Investigate anomalous values in `DAYS_EMPLOYED` (known issue: some values are 365243 — employed since far in the future)
-- [ ] Analyse address mismatch flags (`REG_REGION_NOT_LIVE_REGION` etc.) vs. default rate
-- [ ] Analyse credit bureau enquiry velocity features (`AMT_REQ_CREDIT_BUREAU_*`) vs. default rate
-- [ ] Explore `DAYS_LAST_PHONE_CHANGE` vs. default rate (fraud signal)
-- [ ] Analyse social circle default features (`DEF_30_CNT_SOCIAL_CIRCLE`, `DEF_60_CNT_SOCIAL_CIRCLE`)
-- [ ] Document all missing value patterns — distinguish structural missingness from data quality gaps
+- [x] Distribution plots for key numeric features: `AMT_INCOME_TOTAL`, `AMT_CREDIT`, `AMT_ANNUITY`, `DAYS_BIRTH`, `DAYS_EMPLOYED`
+- [x] Default rate by categorical variables: `NAME_CONTRACT_TYPE`, `NAME_INCOME_TYPE`, `NAME_EDUCATION_TYPE`, `NAME_HOUSING_TYPE`, `OCCUPATION_TYPE`
+- [x] Analyse the 3 `EXT_SOURCE` features — correlation with TARGET, pairwise correlation between sources
+- [x] Investigate anomalous values in `DAYS_EMPLOYED` (known issue: some values are 365243 — employed since far in the future)
+- [x] Analyse address mismatch flags (`REG_REGION_NOT_LIVE_REGION` etc.) vs. default rate
+- [x] Analyse credit bureau enquiry velocity features (`AMT_REQ_CREDIT_BUREAU_*`) vs. default rate
+- [x] Explore `DAYS_LAST_PHONE_CHANGE` vs. default rate (fraud signal)
+- [x] Analyse social circle default features (`DEF_30_CNT_SOCIAL_CIRCLE`, `DEF_60_CNT_SOCIAL_CIRCLE`)
+- [x] Document all missing value patterns — distinguish structural missingness from data quality gaps
 
 **Bureau & Bureau Balance**
-- [ ] Distribution of number of previous bureau credits per applicant
-- [ ] `CREDIT_ACTIVE` status breakdown and default rate per status
-- [ ] `CREDIT_TYPE` breakdown — car, cash, credit card, mortgage etc.
-- [ ] `bureau_balance STATUS` field — distribution of months per DPD bucket (0, 1, 2, 3, 4, 5, C, X)
-- [ ] Analyse `AMT_CREDIT_MAX_OVERDUE` and `AMT_CREDIT_SUM_OVERDUE` distributions
+- [x] Distribution of number of previous bureau credits per applicant
+- [x] `CREDIT_ACTIVE` status breakdown and default rate per status
+- [x] `CREDIT_TYPE` breakdown — car, cash, credit card, mortgage etc.
+- [x] `bureau_balance STATUS` field — distribution of months per DPD bucket (0, 1, 2, 3, 4, 5, C, X)
+- [x] Analyse `AMT_CREDIT_MAX_OVERDUE` and `AMT_CREDIT_SUM_OVERDUE` distributions
 
 **Previous Applications**
-- [ ] `NAME_CONTRACT_STATUS` breakdown (Approved / Refused / Cancelled / Unused offer) vs. default rate
-- [ ] `CODE_REJECT_REASON` analysis — which reasons predict future default?
-- [ ] Application-to-credit gap: `AMT_APPLICATION` vs. `AMT_CREDIT`
-- [ ] Time between previous applications (`DAYS_DECISION`)
+- [x] `NAME_CONTRACT_STATUS` breakdown (Approved / Refused / Cancelled / Unused offer) vs. default rate
+- [x] `CODE_REJECT_REASON` analysis — which reasons predict future default?
+- [x] Application-to-credit gap: `AMT_APPLICATION` vs. `AMT_CREDIT`
+- [x] Time between previous applications (`DAYS_DECISION`)
 
 **Installment Payments**
-- [ ] Compute payment delay: `DAYS_ENTRY_PAYMENT - DAYS_INSTALMENT` — distribution analysis
-- [ ] Compute underpayment: `AMT_PAYMENT / AMT_INSTALMENT` — distribution and relation to TARGET
-- [ ] Proportion of missed payments (rows with no `DAYS_ENTRY_PAYMENT`)
+- [x] Compute payment delay: `DAYS_ENTRY_PAYMENT - DAYS_INSTALMENT` — distribution analysis
+- [x] Compute underpayment: `AMT_PAYMENT / AMT_INSTALMENT` — distribution and relation to TARGET
+- [x] Proportion of missed payments (rows with no `DAYS_ENTRY_PAYMENT`)
 
 **Credit Card Balance**
-- [ ] Monthly utilisation: `AMT_BALANCE / AMT_CREDIT_LIMIT_ACTUAL` — trend over time
-- [ ] ATM cash withdrawal ratio as stress indicator
-- [ ] Minimum-payment-only behaviour flag
+- [x] Monthly utilisation: `AMT_BALANCE / AMT_CREDIT_LIMIT_ACTUAL` — trend over time
+- [x] ATM cash withdrawal ratio as stress indicator
+- [x] Minimum-payment-only behaviour flag
 
 **Building / Neighbourhood Features**
-- [ ] Correlation matrix across `_AVG`, `_MODE`, `_MEDI` variants — assess redundancy
-- [ ] Correlation with TARGET — assess predictive value vs. noise
+- [x] Correlation matrix across `_AVG`, `_MODE`, `_MEDI` variants — assess redundancy
+- [x] Correlation with TARGET — assess predictive value vs. noise
 
 ### Acceptance Criteria
 - Notebook is fully commented and runs end-to-end without errors
