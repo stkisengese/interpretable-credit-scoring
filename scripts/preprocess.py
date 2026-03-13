@@ -27,7 +27,6 @@ def reduce_mem_usage(df):
     to reduce memory usage.
     """
     start_mem = df.memory_usage().sum() / 1024**2
-    print(f'Memory usage of dataframe is {start_mem:.2f} MB')
     
     for col in df.columns:
         col_type = df[col].dtype
@@ -55,8 +54,7 @@ def reduce_mem_usage(df):
             df[col] = df[col].astype('category')
 
     end_mem = df.memory_usage().sum() / 1024**2
-    print(f'Memory usage after optimization is: {end_mem:.2f} MB')
-    print(f'Decreased by {100 * (start_mem - end_mem) / start_mem:.1f}%')
+    print(f'Memory usage decreased by {100 * (start_mem - end_mem) / start_mem:.1f}%')
     return df
 
 # --- Custom Transformers ---
@@ -119,49 +117,25 @@ def preprocess_data():
     del train_df
     gc.collect()
 
-    print("Initial cleanup on training data...")
+    print("Building and fitting full pipeline...")
+    # 1. Cleanup components
     cleanup_pipeline = Pipeline([
         ('days_employed_fix', DaysEmployedAnomalyFixer()),
         ('own_car_age', OwnCarAgeImputer()),
         ('time_vars', TimeVariableTransformer()),
         ('income_log', IncomeTransformer())
     ])
-    X_train_clean = cleanup_pipeline.fit_transform(X_train)
-    del X_train
-    gc.collect()
 
-    # Identify numeric and categorical features
-    numeric_features = X_train_clean.select_dtypes(include=['number']).columns.tolist()
-    categorical_features = X_train_clean.select_dtypes(include=['category', 'object']).columns.tolist()
-
-    print("Fitting preprocessor on training data...")
-    numeric_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='median', add_indicator=True))])
+    # 2. Imputation and Encoding components
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median', add_indicator=True))
+    ])
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=True, min_frequency=0.01))
     ])
     
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_features),
-            ('cat', categorical_transformer, categorical_features)
-        ],
-        verbose_feature_names_out=False,
-        remainder='passthrough'
-    )
-    
-    X_train_processed = preprocessor.fit_transform(X_train_clean)
-    del X_train_clean
-    gc.collect()
-
-    print("Saving processed training data and pipeline...")
-    joblib.dump(X_train_processed, os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
-    joblib.dump(y_train, os.path.join(FEATURE_ENG_DIR, "y_train.joblib"))
-    joblib.dump(train_ids, os.path.join(FEATURE_ENG_DIR, "train_ids.joblib"))
-    del X_train_processed, y_train, train_ids
-    gc.collect()
-
-    # Define full pipeline
+    # 3. Combine into full pipeline
     full_pipeline = Pipeline([
         ('cleanup', cleanup_pipeline),
         ('preprocessor', ColumnTransformer(
@@ -173,7 +147,23 @@ def preprocess_data():
             remainder='passthrough'
         ))
     ])
+
+    # Fit the full pipeline at once
+    full_pipeline.fit(X_train)
+    
+    print("Transforming training data...")
+    X_train_processed = full_pipeline.transform(X_train)
+    
+    # Save processed training data and labels
+    joblib.dump(X_train_processed, os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
+    joblib.dump(y_train, os.path.join(FEATURE_ENG_DIR, "y_train.joblib"))
+    joblib.dump(train_ids, os.path.join(FEATURE_ENG_DIR, "train_ids.joblib"))
+    
+    # Save the fitted pipeline
     joblib.dump(full_pipeline, os.path.join(MODEL_DIR, "preprocessing_pipeline.pkl"))
+    
+    del X_train, X_train_processed, y_train, train_ids
+    gc.collect()
 
     print("Loading test data...")
     test_df = pd.read_csv(os.path.join(DATA_DIR, "application_test.csv"), low_memory=False)
@@ -183,16 +173,9 @@ def preprocess_data():
     del test_df
     gc.collect()
 
-    print("Applying transformations to test data...")
-    X_test_clean = cleanup_pipeline.transform(X_test)
-    del X_test
-    gc.collect()
-
-    X_test_processed = preprocessor.transform(X_test_clean)
-    del X_test_clean
-    gc.collect()
-
-    print("Saving processed test data...")
+    print("Transforming test data...")
+    X_test_processed = full_pipeline.transform(X_test)
+    
     joblib.dump(X_test_processed, os.path.join(FEATURE_ENG_DIR, "X_test_processed.joblib"))
     joblib.dump(test_ids, os.path.join(FEATURE_ENG_DIR, "test_ids.joblib"))
     
