@@ -58,3 +58,24 @@ def reduce_mem_usage(df):
     print(f'Memory usage after optimization is: {end_mem:.2f} MB')
     print(f'Decreased by {100 * (start_mem - end_mem) / start_mem:.1f}%')
     return df
+
+# --- Custom Transformers ---
+
+class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None): return self
+    def transform(self, X):
+        X = X.copy()
+        if 'DAYS_EMPLOYED' in X.columns:
+            # Handle both float and int types for the value
+            X['DAYS_EMPLOYED'] = X['DAYS_EMPLOYED'].replace(365243, np.nan)
+        return X
+
+class TimeVariableTransformer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None): return self
+    def transform(self, X):
+        X = X.copy()
+        if 'DAYS_BIRTH' in X.columns:
+            X['AGE_YEARS'] = np.abs(X['DAYS_BIRTH'].astype(float)) / 365.0
+        if 'DAYS_EMPLOYED' in X.columns:
+            X['YEARS_EMPLOYED'] = np.abs(X['DAYS_EMPLOYED'].astype(float)) / 365.0
+        return X
