@@ -149,6 +149,42 @@ def preprocess_data():
     del X_train_processed, y_train, train_ids
     gc.collect()
 
+    # Define full pipeline
+    full_pipeline = Pipeline([
+        ('cleanup', cleanup_pipeline),
+        ('preprocessor', ColumnTransformer(
+            transformers=[
+                ('num', numeric_transformer, make_column_selector(dtype_include=np.number)),
+                ('cat', categorical_transformer, make_column_selector(dtype_include=['category', 'object']))
+            ],
+            verbose_feature_names_out=False,
+            remainder='passthrough'
+        ))
+    ])
+    joblib.dump(full_pipeline, os.path.join(MODEL_DIR, "preprocessing_pipeline.pkl"))
+
+    print("Loading test data...")
+    test_df = pd.read_csv(os.path.join(DATA_DIR, "application_test.csv"), low_memory=False)
+    test_df = reduce_mem_usage(test_df)
+    test_ids = test_df['SK_ID_CURR'].copy()
+    X_test = test_df.drop(columns=['SK_ID_CURR'])
+    del test_df
+    gc.collect()
+
+    print("Applying transformations to test data...")
+    X_test_clean = cleanup_pipeline.transform(X_test)
+    del X_test
+    gc.collect()
+
+    X_test_processed = preprocessor.transform(X_test_clean)
+    del X_test_clean
+    gc.collect()
+
+    print("Saving processed test data...")
+    joblib.dump(X_test_processed, os.path.join(FEATURE_ENG_DIR, "X_test_processed.joblib"))
+    joblib.dump(test_ids, os.path.join(FEATURE_ENG_DIR, "test_ids.joblib"))
+    
+    print("Preprocessing complete.")
 
 if __name__ == "__main__":
     preprocess_data()
