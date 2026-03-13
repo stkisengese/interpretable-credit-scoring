@@ -118,6 +118,37 @@ def preprocess_data():
     del X_train
     gc.collect()
 
+    # Identify numeric and categorical features
+    numeric_features = X_train_clean.select_dtypes(include=['number']).columns.tolist()
+    categorical_features = X_train_clean.select_dtypes(include=['category', 'object']).columns.tolist()
+
+    print("Fitting preprocessor on training data...")
+    numeric_transformer = Pipeline(steps=[('imputer', SimpleImputer(strategy='median', add_indicator=True))])
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=True, min_frequency=0.01))
+    ])
+    
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, numeric_features),
+            ('cat', categorical_transformer, categorical_features)
+        ],
+        verbose_feature_names_out=False,
+        remainder='passthrough'
+    )
+    
+    X_train_processed = preprocessor.fit_transform(X_train_clean)
+    del X_train_clean
+    gc.collect()
+
+    print("Saving processed training data and pipeline...")
+    joblib.dump(X_train_processed, os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
+    joblib.dump(y_train, os.path.join(FEATURE_ENG_DIR, "y_train.joblib"))
+    joblib.dump(train_ids, os.path.join(FEATURE_ENG_DIR, "train_ids.joblib"))
+    del X_train_processed, y_train, train_ids
+    gc.collect()
+
 
 if __name__ == "__main__":
     preprocess_data()
