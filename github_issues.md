@@ -130,30 +130,30 @@ Build a reproducible preprocessing pipeline (`preprocess.py`) that handles all d
 ### Tasks
 
 **Missing Value Treatment**
-- [ ] Fix `DAYS_EMPLOYED` anomaly — replace 365243 values with NaN, then impute or flag
-- [ ] For `EXT_SOURCE_1/2/3` — impute missing values with median or model-based imputation; flag missingness as a binary feature (absence of bureau record is informative)
-- [ ] For high-missingness building columns (`_AVG/_MODE/_MEDI`) — assess whether to impute, drop, or encode missingness as a feature
-- [ ] For `OWN_CAR_AGE` — missing means no car; impute with 0 or flag explicitly
-- [ ] Document imputation strategy chosen for each feature group
+- [x] Fix `DAYS_EMPLOYED` anomaly — replace 365243 values with NaN, then impute or flag
+- [x] For `EXT_SOURCE_1/2/3` — impute missing values with median or model-based imputation; flag missingness as a binary feature (absence of bureau record is informative)
+- [x] For high-missingness building columns (`_AVG/_MODE/_MEDI`) — assess whether to impute, drop, or encode missingness as a feature
+- [x] For `OWN_CAR_AGE` — missing means no car; impute with 0 or flag explicitly
+- [x] Document imputation strategy chosen for each feature group
 
 **Encoding**
-- [ ] Binary encode flag columns (already 0/1 — verify consistency)
-- [ ] Label encode or one-hot encode categorical variables (`NAME_CONTRACT_TYPE`, `NAME_INCOME_TYPE`, `CODE_GENDER`, etc.)
-- [ ] Handle `CODE_GENDER` — verify `XNA` category and decide treatment
+- [x] Binary encode flag columns (already 0/1 — verify consistency)
+- [x] Label encode or one-hot encode categorical variables (`NAME_CONTRACT_TYPE`, `NAME_INCOME_TYPE`, `CODE_GENDER`, etc.)
+- [x] Handle `CODE_GENDER` — verify `XNA` category and decide treatment
 
 **Outlier Treatment**
-- [ ] Cap or log-transform `AMT_INCOME_TOTAL` (heavy right skew)
-- [ ] Review and cap extreme values in bureau amount columns
+- [x] Cap or log-transform `AMT_INCOME_TOTAL` (heavy right skew)
+- [x] Review and cap extreme values in bureau amount columns
 
 **Time Variable Handling**
-- [ ] Document and enforce sign convention: all `DAYS_*` are negative integers (days before application)
-- [ ] Convert `DAYS_BIRTH` to age in years: `abs(DAYS_BIRTH) / 365`
-- [ ] Convert `DAYS_EMPLOYED` to years employed (after fixing anomaly)
+- [x] Document and enforce sign convention: all `DAYS_*` are negative integers (days before application)
+- [x] Convert `DAYS_BIRTH` to age in years: `abs(DAYS_BIRTH) / 365`
+- [x] Convert `DAYS_EMPLOYED` to years employed (after fixing anomaly)
 
 **Pipeline Design**
-- [ ] Wrap preprocessing steps in a `sklearn.pipeline.Pipeline` or `ColumnTransformer` for reproducibility
-- [ ] Ensure pipeline can be applied identically to both train and test sets
-- [ ] Save fitted pipeline as a serialisable object alongside the model
+- [x] Wrap preprocessing steps in a `sklearn.pipeline.Pipeline` or `ColumnTransformer` for reproducibility
+- [x] Ensure pipeline can be applied identically to both train and test sets
+- [x] Save fitted pipeline as a serialisable object alongside the model
 
 ### Acceptance Criteria
 - Preprocessing pipeline runs without errors on both train and test sets
