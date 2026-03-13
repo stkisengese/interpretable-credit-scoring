@@ -79,3 +79,19 @@ class TimeVariableTransformer(BaseEstimator, TransformerMixin):
         if 'DAYS_EMPLOYED' in X.columns:
             X['YEARS_EMPLOYED'] = np.abs(X['DAYS_EMPLOYED'].astype(float)) / 365.0
         return X
+
+class IncomeTransformer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None): return self
+    def transform(self, X):
+        X = X.copy()
+        if 'AMT_INCOME_TOTAL' in X.columns:
+            X['AMT_INCOME_TOTAL_LOG'] = np.log1p(X['AMT_INCOME_TOTAL'].astype(float))
+        return X
+
+class OwnCarAgeImputer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None): return self
+    def transform(self, X):
+        X = X.copy()
+        if 'OWN_CAR_AGE' in X.columns:
+            X['OWN_CAR_AGE'] = X['OWN_CAR_AGE'].fillna(0)
+        return X
