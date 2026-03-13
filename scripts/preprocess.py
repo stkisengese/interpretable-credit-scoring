@@ -62,6 +62,9 @@ def reduce_mem_usage(df):
 # --- Custom Transformers ---
 
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
+    """
+    Fixes the anomaly in 'DAYS_EMPLOYED' where 365243 indicates missing data.
+    """
     def fit(self, X, y=None): return self
     def transform(self, X):
         X = X.copy()
@@ -71,6 +74,9 @@ class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
         return X
 
 class TimeVariableTransformer(BaseEstimator, TransformerMixin):
+    """
+    Transforms time-related variables from days to more interpretable units (e.g., years).
+    """
     def fit(self, X, y=None): return self
     def transform(self, X):
         X = X.copy()
@@ -81,6 +87,9 @@ class TimeVariableTransformer(BaseEstimator, TransformerMixin):
         return X
 
 class IncomeTransformer(BaseEstimator, TransformerMixin):
+    """
+    Applies log transformation to 'AMT_INCOME_TOTAL' to reduce skewness.
+    """
     def fit(self, X, y=None): return self
     def transform(self, X):
         X = X.copy()
@@ -89,6 +98,9 @@ class IncomeTransformer(BaseEstimator, TransformerMixin):
         return X
 
 class OwnCarAgeImputer(BaseEstimator, TransformerMixin):
+    """
+    Imputes missing values in 'OWN_CAR_AGE' with 0.
+    """
     def fit(self, X, y=None): return self
     def transform(self, X):
         X = X.copy()
