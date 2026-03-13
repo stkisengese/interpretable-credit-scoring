@@ -136,23 +136,24 @@ def preprocess_data():
     ])
     
     # 3. Combine into full pipeline
+    # NOTE: We use specific column types to ensure consistency
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, make_column_selector(dtype_include=np.number)),
+            ('cat', categorical_transformer, make_column_selector(dtype_include=['category', 'object']))
+        ],
+        verbose_feature_names_out=False,
+        remainder='passthrough'
+    )
+
+
     full_pipeline = Pipeline([
         ('cleanup', cleanup_pipeline),
-        ('preprocessor', ColumnTransformer(
-            transformers=[
-                ('num', numeric_transformer, make_column_selector(dtype_include=np.number)),
-                ('cat', categorical_transformer, make_column_selector(dtype_include=['category', 'object']))
-            ],
-            verbose_feature_names_out=False,
-            remainder='passthrough'
-        ))
+        ('preprocessor', preprocessor)
     ])
 
-    # Fit the full pipeline at once
-    full_pipeline.fit(X_train)
-    
-    print("Transforming training data...")
-    X_train_processed = full_pipeline.transform(X_train)
+    print("Fitting and transforming training data...")
+    X_train_processed = full_pipeline.fit_transform(X_train)
     
     # Save processed training data and labels
     joblib.dump(X_train_processed, os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
