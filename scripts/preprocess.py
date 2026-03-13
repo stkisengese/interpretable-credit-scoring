@@ -95,3 +95,29 @@ class OwnCarAgeImputer(BaseEstimator, TransformerMixin):
         if 'OWN_CAR_AGE' in X.columns:
             X['OWN_CAR_AGE'] = X['OWN_CAR_AGE'].fillna(0)
         return X
+
+def preprocess_data():
+    print("Loading training data...")
+    train_df = pd.read_csv(os.path.join(DATA_DIR, "application_train.csv"), low_memory=False)
+    train_df = reduce_mem_usage(train_df)
+    
+    y_train = train_df['TARGET'].copy()
+    train_ids = train_df['SK_ID_CURR'].copy()
+    X_train = train_df.drop(columns=['TARGET', 'SK_ID_CURR'])
+    del train_df
+    gc.collect()
+
+    print("Initial cleanup on training data...")
+    cleanup_pipeline = Pipeline([
+        ('days_employed_fix', DaysEmployedAnomalyFixer()),
+        ('own_car_age', OwnCarAgeImputer()),
+        ('time_vars', TimeVariableTransformer()),
+        ('income_log', IncomeTransformer())
+    ])
+    X_train_clean = cleanup_pipeline.fit_transform(X_train)
+    del X_train
+    gc.collect()
+
+
+if __name__ == "__main__":
+    preprocess_data()
