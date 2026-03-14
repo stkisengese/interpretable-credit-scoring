@@ -424,6 +424,54 @@ def aggregate_pos_cash_features(pos_cash_df):
     return pos_agg
 
 
+def aggregate_previous_application_features(prev_df):
+    """
+    Aggregate previous Home Credit application data per SK_ID_CURR.
+
+    Features
+    --------
+    PREV_TOTAL_COUNT                     : total previous applications
+    PREV_APPROVED_COUNT                  : number of approved applications
+    PREV_REFUSED_COUNT                   : number of refused applications
+    PREV_CANCELLED_COUNT                 : number of cancelled applications
+    PREV_APPROVAL_RATE                   : approved / total
+    PREV_AMT_CREDIT_APPLICATION_GAP_MEAN : mean (AMT_CREDIT − AMT_APPLICATION)
+                                           — lender haircut signal
+    PREV_PRODUCT_TYPE_COUNT              : distinct product types applied for
+    PREV_DAYS_DECISION_MAX               : days since most recent previous application
+    """
+    print("  Aggregating previous application features...")
+    prev = prev_df.copy()
+    eps = 1e-9
+
+    # Lender haircut: how much less was approved vs requested
+    prev["AMT_CREDIT_APPLICATION_GAP"] = prev["AMT_CREDIT"] - prev["AMT_APPLICATION"]
+
+    prev["IS_APPROVED"] = (prev["NAME_CONTRACT_STATUS"] == "Approved").astype(int)
+    prev["IS_REFUSED"] = (prev["NAME_CONTRACT_STATUS"] == "Refused").astype(int)
+    prev["IS_CANCELLED"] = (prev["NAME_CONTRACT_STATUS"] == "Canceled").astype(int)
+
+    prev_agg = (
+        prev.groupby("SK_ID_CURR")
+        .agg(
+            PREV_TOTAL_COUNT=("SK_ID_PREV", "count"),
+            PREV_APPROVED_COUNT=("IS_APPROVED", "sum"),
+            PREV_REFUSED_COUNT=("IS_REFUSED", "sum"),
+            PREV_CANCELLED_COUNT=("IS_CANCELLED", "sum"),
+            PREV_AMT_CREDIT_APPLICATION_GAP_MEAN=("AMT_CREDIT_APPLICATION_GAP", "mean"),
+            PREV_PRODUCT_TYPE_COUNT=("NAME_CONTRACT_TYPE", "nunique"),
+            PREV_DAYS_DECISION_MAX=("DAYS_DECISION", "max"),
+        )
+        .reset_index()
+    )
+
+    prev_agg["PREV_APPROVAL_RATE"] = prev_agg["PREV_APPROVED_COUNT"] / (
+        prev_agg["PREV_TOTAL_COUNT"] + eps
+    )
+
+    return prev_agg
+
+
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
 
