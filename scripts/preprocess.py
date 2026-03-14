@@ -89,6 +89,19 @@ class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
             X['DAYS_EMPLOYED'] = X['DAYS_EMPLOYED'].replace(365243, np.nan)
         return X
 
+
+class OwnCarAgeImputer(BaseEstimator, TransformerMixin):
+    """Impute OWN_CAR_AGE NaN with 0 — missing means no car."""
+
+    def fit(self, X, y=None): return self
+
+    def transform(self, X):
+        X = X.copy()
+        if 'OWN_CAR_AGE' in X.columns:
+            X['OWN_CAR_AGE'] = X['OWN_CAR_AGE'].fillna(0)
+        return X
+
+
 class TimeVariableTransformer(BaseEstimator, TransformerMixin):
     """Convert DAYS_BIRTH / DAYS_EMPLOYED to positive years (if not yet done)."""
 
