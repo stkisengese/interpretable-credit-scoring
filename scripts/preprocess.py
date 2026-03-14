@@ -703,6 +703,32 @@ def preprocess_data():
     except FileNotFoundError as exc:
         print(f"  [SKIP] installments: {exc}")
 
+    # Credit Card Balance
+    try:
+        cc_df = pd.read_csv(
+            os.path.join(DATA_DIR, "credit_card_balance.csv"), low_memory=False
+        )
+        cc_df = reduce_mem_usage(cc_df)
+        cc_agg = aggregate_credit_card_features(cc_df)
+        del cc_df
+        gc.collect()
+        print(f"  Credit card agg shape: {cc_agg.shape}")
+    except FileNotFoundError as exc:
+        print(f"  [SKIP] credit_card_balance: {exc}")
+
+    # POS/Cash Balance
+    try:
+        pos_df = pd.read_csv(
+            os.path.join(DATA_DIR, "POS_CASH_balance.csv"), low_memory=False
+        )
+        pos_df = reduce_mem_usage(pos_df)
+        pos_agg = aggregate_pos_cash_features(pos_df)
+        del pos_df
+        gc.collect()
+        print(f"  POS/cash agg shape: {pos_agg.shape}")
+    except FileNotFoundError as exc:
+        print(f"  [SKIP] POS_CASH_balance: {exc}")
+
     gc.collect()
 
     # ── Step 5: Fit sklearn pipeline on train; transform both ─────────────────
