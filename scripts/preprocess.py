@@ -350,6 +350,47 @@ def aggregate_installment_features(installments_df):
     return inst_agg
 
 
+def aggregate_credit_card_features(cc_balance_df):
+    """
+    Aggregate credit card balance data per SK_ID_CURR.
+
+    Features
+    --------
+    CC_UTILISATION_MEAN     : mean monthly utilisation (AMT_BALANCE / CREDIT_LIMIT)
+    CC_UTILISATION_MAX      : peak monthly utilisation
+    CC_ATM_DRAW_RATIO       : mean(ATM draws / total draws) — cash stress indicator
+    CC_MIN_PAYMENT_RATIO    : mean(payment / minimum required) — underpayment signal
+    CC_DPD_MAX              : worst SK_DPD across all months
+    CC_DPD_MEAN             : average SK_DPD
+    """
+    print("  Aggregating credit card balance features...")
+    cc = cc_balance_df.copy()
+    eps = 1e-9
+
+    cc["UTILISATION"] = cc["AMT_BALANCE"] / (cc["AMT_CREDIT_LIMIT_ACTUAL"] + eps)
+    cc["ATM_DRAW_RATIO"] = cc["AMT_DRAWINGS_ATM_CURRENT"] / (
+        cc["AMT_DRAWINGS_CURRENT"] + eps
+    )
+    cc["MIN_PAYMENT_RATIO"] = cc["AMT_PAYMENT_CURRENT"] / (
+        cc["AMT_INST_MIN_REGULARITY"] + eps
+    )
+
+    cc_agg = (
+        cc.groupby("SK_ID_CURR")
+        .agg(
+            CC_UTILISATION_MEAN=("UTILISATION", "mean"),
+            CC_UTILISATION_MAX=("UTILISATION", "max"),
+            CC_ATM_DRAW_RATIO=("ATM_DRAW_RATIO", "mean"),
+            CC_MIN_PAYMENT_RATIO=("MIN_PAYMENT_RATIO", "mean"),
+            CC_DPD_MAX=("SK_DPD", "max"),
+            CC_DPD_MEAN=("SK_DPD", "mean"),
+        )
+        .reset_index()
+    )
+
+    return cc_agg
+
+
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
 
