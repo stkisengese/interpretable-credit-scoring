@@ -280,6 +280,76 @@ def aggregate_bureau_features(bureau_df, bureau_balance_df=None):
     return bureau_agg
 
 
+def aggregate_installment_features(installments_df):
+    """
+    Aggregate installment payment data per SK_ID_CURR.
+
+    Features
+    --------
+    INST_PAYMENT_DELAY_MEAN     : mean days between due and actual payment
+                                  (positive = late, negative = early)
+    INST_PAYMENT_DELAY_MAX      : worst single payment delay
+    INST_PAYMENT_RATIO_MEAN     : mean(AMT_PAYMENT / AMT_INSTALMENT)
+    INST_PAYMENT_RATIO_MIN      : min payment ratio (worst single installment)
+    INST_LATE_PAYMENT_COUNT     : total number of late payments
+    INST_MISSED_PAYMENT_COUNT   : installments with no DAYS_ENTRY_PAYMENT recorded
+    INST_RECENT_DELAY_TREND     : mean delay (last 12 months) − mean delay (older)
+                                  positive trend = getting worse
+    """
+    print("  Aggregating installment payment features...")
+    inst = installments_df.copy()
+    eps = 1e-9
+
+    inst["PAYMENT_DELAY"] = inst["DAYS_ENTRY_PAYMENT"] - inst["DAYS_INSTALMENT"]
+    inst["PAYMENT_RATIO"] = inst["AMT_PAYMENT"] / (inst["AMT_INSTALMENT"] + eps)
+    inst["IS_LATE"] = (inst["PAYMENT_DELAY"] > 0).astype(int)
+    inst["IS_MISSED"] = inst["DAYS_ENTRY_PAYMENT"].isna().astype(int)
+
+    # Trend: last 12 months vs historical
+    # DAYS_INSTALMENT is negative (days before application date)
+    recent_mask = inst["DAYS_INSTALMENT"] > -365
+    recent_delay = (
+        inst[recent_mask]
+        .groupby("SK_ID_CURR")["PAYMENT_DELAY"]
+        .mean()
+        .rename("INST_RECENT_DELAY_MEAN")
+    )
+    hist_delay = (
+        inst[~recent_mask]
+        .groupby("SK_ID_CURR")["PAYMENT_DELAY"]
+        .mean()
+        .rename("INST_HIST_DELAY_MEAN")
+    )
+
+    inst_agg = (
+        inst.groupby("SK_ID_CURR")
+        .agg(
+            INST_PAYMENT_DELAY_MEAN=("PAYMENT_DELAY", "mean"),
+            INST_PAYMENT_DELAY_MAX=("PAYMENT_DELAY", "max"),
+            INST_PAYMENT_RATIO_MEAN=("PAYMENT_RATIO", "mean"),
+            INST_PAYMENT_RATIO_MIN=("PAYMENT_RATIO", "min"),
+            INST_LATE_PAYMENT_COUNT=("IS_LATE", "sum"),
+            INST_MISSED_PAYMENT_COUNT=("IS_MISSED", "sum"),
+        )
+        .reset_index()
+    )
+
+    # Merge trend components
+    inst_agg = inst_agg.merge(recent_delay, on="SK_ID_CURR", how="left")
+    inst_agg = inst_agg.merge(hist_delay, on="SK_ID_CURR", how="left")
+    inst_agg["INST_RECENT_DELAY_TREND"] = (
+        inst_agg["INST_RECENT_DELAY_MEAN"] - inst_agg["INST_HIST_DELAY_MEAN"]
+    )
+    # Drop intermediate columns
+    inst_agg.drop(
+        columns=["INST_RECENT_DELAY_MEAN", "INST_HIST_DELAY_MEAN"],
+        inplace=True,
+        errors="ignore",
+    )
+
+    return inst_agg
+
+
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
 
