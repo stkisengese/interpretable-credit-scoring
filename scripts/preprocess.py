@@ -501,6 +501,34 @@ def build_feature_matrix(app_df, bureau_agg=None, inst_agg=None,
     return df
 
 
+def save_feature_descriptions(df, exclude_cols=("SK_ID_CURR", "TARGET")):
+    """Save a CSV documenting every feature name, dtype and missingness."""
+    rows = []
+    for col in df.columns:
+        if col in exclude_cols:
+            continue
+        rows.append(
+            {
+                "feature": col,
+                "dtype": str(df[col].dtype),
+                "pct_missing": round(df[col].isna().mean() * 100, 2),
+                "example_values": str(df[col].dropna().iloc[:3].tolist())
+                if len(df[col].dropna()) > 0
+                else "all_nan",
+            }
+        )
+    out = pd.DataFrame(rows)
+    path = os.path.join(FEATURE_ENG_DIR, "feature_descriptions.csv")
+    out.to_csv(path, index=False)
+    print(f"  Feature descriptions saved → {path}  ({len(out)} features)")
+    return out
+
+
+# ===========================================================================
+# SKLEARN PIPELINE CLASSES
+# ===========================================================================
+
+
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
 
