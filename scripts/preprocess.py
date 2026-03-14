@@ -472,6 +472,35 @@ def aggregate_previous_application_features(prev_df):
     return prev_agg
 
 
+def build_feature_matrix(app_df, bureau_agg=None, inst_agg=None,
+                          cc_agg=None, pos_agg=None, prev_agg=None):
+    """
+    Left-join all aggregated feature tables onto the application table.
+    All applicants are preserved; missing joins produce NaN (handled by imputer).
+    No duplicates are introduced because each aggregation is keyed on SK_ID_CURR.
+    """
+    print("  Merging feature tables into main matrix...")
+    df = app_df.copy()
+    n_start = df.shape[1]
+
+    for agg_df, name in [
+        (bureau_agg, "bureau + bureau_balance"),
+        (inst_agg, "installments_payments"),
+        (cc_agg, "credit_card_balance"),
+        (pos_agg, "POS_CASH_balance"),
+        (prev_agg, "previous_application"),
+    ]:
+        if agg_df is not None:
+            df = df.merge(agg_df, on="SK_ID_CURR", how="left")
+            print(
+                f"    [{name}] → +{df.shape[1] - n_start} cols, "
+                f"total shape: {df.shape}"
+            )
+            n_start = df.shape[1]
+
+    return df
+
+
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
 
