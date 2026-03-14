@@ -391,6 +391,39 @@ def aggregate_credit_card_features(cc_balance_df):
     return cc_agg
 
 
+def aggregate_pos_cash_features(pos_cash_df):
+    """
+    Aggregate POS/cash balance data per SK_ID_CURR.
+
+    Features
+    --------
+    POS_DPD_COUNT                   : number of months with SK_DPD > 0
+    POS_DPD_MAX                     : worst SK_DPD across all months
+    POS_INSTALMENT_REMAINING_MEAN   : mean(CNT_INSTALMENT_FUTURE / CNT_INSTALMENT)
+                                      — how far through the loan on average
+    """
+    print("  Aggregating POS/cash balance features...")
+    pos = pos_cash_df.copy()
+    eps = 1e-9
+
+    pos["IS_DPD"] = (pos["SK_DPD"] > 0).astype(int)
+    pos["INSTALMENT_REMAINING_PROP"] = pos["CNT_INSTALMENT_FUTURE"] / (
+        pos["CNT_INSTALMENT"] + eps
+    )
+
+    pos_agg = (
+        pos.groupby("SK_ID_CURR")
+        .agg(
+            POS_DPD_COUNT=("IS_DPD", "sum"),
+            POS_DPD_MAX=("SK_DPD", "max"),
+            POS_INSTALMENT_REMAINING_MEAN=("INSTALMENT_REMAINING_PROP", "mean"),
+        )
+        .reset_index()
+    )
+
+    return pos_agg
+
+
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
 
