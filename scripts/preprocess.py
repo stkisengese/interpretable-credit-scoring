@@ -631,21 +631,33 @@ def build_sklearn_pipeline():
     del X_train, X_train_processed, y_train, train_ids
     gc.collect()
 
-    print("Loading test data...")
-    test_df = pd.read_csv(os.path.join(DATA_DIR, "application_test.csv"), low_memory=False)
-    test_df = reduce_mem_usage(test_df)
-    test_ids = test_df['SK_ID_CURR'].copy()
-    X_test = test_df.drop(columns=['SK_ID_CURR'])
-    del test_df
+    # ── Step 5: Fit sklearn pipeline on train; transform both ─────────────────
+    print(f"\n{sep}\nSTEP 5 — Applying sklearn pipeline (imputation + encoding)\n{sep}")
+    pipeline = build_sklearn_pipeline()
+
+    print("  Fitting + transforming training data …")
+    X_train_processed = pipeline.fit_transform(train_full)
+
+    print("  Transforming test data …")
+    X_test_processed = pipeline.transform(test_full)
+
+    del train_full, test_full
     gc.collect()
 
-    print("Transforming test data...")
-    X_test_processed = full_pipeline.transform(X_test)
-    
+    # ── Step 6: Save artefacts ────────────────────────────────────────────────
+    print(f"\n{sep}\nSTEP 6 — Saving artefacts\n{sep}")
+
+    joblib.dump(X_train_processed, os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
     joblib.dump(X_test_processed, os.path.join(FEATURE_ENG_DIR, "X_test_processed.joblib"))
+    joblib.dump(y_train, os.path.join(FEATURE_ENG_DIR, "y_train.joblib"))
+    joblib.dump(train_ids, os.path.join(FEATURE_ENG_DIR, "train_ids.joblib"))
     joblib.dump(test_ids, os.path.join(FEATURE_ENG_DIR, "test_ids.joblib"))
-    
-    print("Preprocessing complete.")
+    joblib.dump(pipeline, os.path.join(MODEL_DIR, "preprocessing_pipeline.pkl"))
+
+    print(f"  X_train_processed : {X_train_processed.shape}")
+    print(f"  X_test_processed  : {X_test_processed.shape}")
+    print(f"\nAll artefacts saved to '{FEATURE_ENG_DIR}' and '{MODEL_DIR}'.")
+    print("\n✓  Preprocessing + Feature Engineering complete.")
 
 if __name__ == "__main__":
     preprocess_data()
