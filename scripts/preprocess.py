@@ -753,6 +753,24 @@ def preprocess_data():
         prev_agg=prev_agg,
     )
   
+    print(f"Final merged shape: {combined_df.shape}")
+
+    # Document features before encoding
+    save_feature_descriptions(combined_df)
+
+    # Split back to train / test
+    train_mask = combined_df["SK_ID_CURR"].isin(train_ids.values)
+    train_full = combined_df[train_mask].drop(columns=["TARGET", "SK_ID_CURR"])
+    test_full = combined_df[~train_mask].drop(columns=["TARGET", "SK_ID_CURR"])
+
+    # Save raw (pre-pipeline) feature frames for visualisation use (Issue #8)
+    train_raw_path = os.path.join(FEATURE_ENG_DIR, "train_features_raw.pkl")
+    test_raw_path = os.path.join(FEATURE_ENG_DIR, "test_features_raw.pkl")
+    combined_df[train_mask].to_pickle(train_raw_path)
+    combined_df[~train_mask].to_pickle(test_raw_path)
+    print(f"  Raw feature frames saved for downstream visualisation.")
+
+    del combined_df
     gc.collect()
 
     # ── Step 5: Fit sklearn pipeline on train; transform both ─────────────────
