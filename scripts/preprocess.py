@@ -729,6 +729,30 @@ def preprocess_data():
     except FileNotFoundError as exc:
         print(f"  [SKIP] POS_CASH_balance: {exc}")
 
+    # Previous Applications
+    try:
+        prev_df = pd.read_csv(
+            os.path.join(DATA_DIR, "previous_application.csv"), low_memory=False
+        )
+        prev_df = reduce_mem_usage(prev_df)
+        prev_agg = aggregate_previous_application_features(prev_df)
+        del prev_df
+        gc.collect()
+        print(f"  Previous application agg shape: {prev_agg.shape}")
+    except FileNotFoundError as exc:
+        print(f"  [SKIP] previous_application: {exc}")
+
+    # ── Step 4: Build merged feature matrix ──────────────────────────────────
+    print(f"\n{sep}\nSTEP 4 — Building merged feature matrix\n{sep}")
+    combined_df = build_feature_matrix(
+        combined_df,
+        bureau_agg=bureau_agg,
+        inst_agg=inst_agg,
+        cc_agg=cc_agg,
+        pos_agg=pos_agg,
+        prev_agg=prev_agg,
+    )
+  
     gc.collect()
 
     # ── Step 5: Fit sklearn pipeline on train; transform both ─────────────────
