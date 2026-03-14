@@ -663,6 +663,46 @@ def preprocess_data():
     gc.collect()
     print(f"Combined shape: {combined_df.shape}")
 
+    # ── Step 2: Application ratio features ───────────────────────────────────
+    print(f"\n{sep}\nSTEP 2 — Engineering application-level features\n{sep}")
+    combined_df = engineer_application_features(combined_df)
+    print(f"After application feature engineering: {combined_df.shape}")
+
+    # ── Step 3: Aggregate supplementary tables ────────────────────────────────
+    print(f"\n{sep}\nSTEP 3 — Aggregating supplementary tables\n{sep}")
+
+    bureau_agg = inst_agg = cc_agg = pos_agg = prev_agg = None
+
+    # Bureau + Bureau Balance
+    try:
+        bureau_df = pd.read_csv(
+            os.path.join(DATA_DIR, "bureau.csv"), low_memory=False
+        )
+        bureau_df = reduce_mem_usage(bureau_df)
+        bb_df = pd.read_csv(
+            os.path.join(DATA_DIR, "bureau_balance.csv"), low_memory=False
+        )
+        bb_df = reduce_mem_usage(bb_df)
+        bureau_agg = aggregate_bureau_features(bureau_df, bb_df)
+        del bureau_df, bb_df
+        gc.collect()
+        print(f"  Bureau agg shape: {bureau_agg.shape}")
+    except FileNotFoundError as exc:
+        print(f"  [SKIP] bureau: {exc}")
+
+    # Installment Payments
+    try:
+        inst_df = pd.read_csv(
+            os.path.join(DATA_DIR, "installments_payments.csv"), low_memory=False
+        )
+        inst_df = reduce_mem_usage(inst_df)
+        inst_agg = aggregate_installment_features(inst_df)
+        del inst_df
+        gc.collect()
+        print(f"  Installments agg shape: {inst_agg.shape}")
+    except FileNotFoundError as exc:
+        print(f"  [SKIP] installments: {exc}")
+
     gc.collect()
 
     # ── Step 5: Fit sklearn pipeline on train; transform both ─────────────────
