@@ -175,7 +175,110 @@ def engineer_application_features(df):
 
     return df
 
-# --- Custom Transformers ---
+
+def aggregate_bureau_features(bureau_df, bureau_balance_df=None):
+    """
+    Aggregate bureau and bureau_balance data per SK_ID_CURR.
+
+    Bureau features
+    ---------------
+    BUREAU_LOAN_COUNT              : total number of past bureau credits
+    BUREAU_ACTIVE_COUNT            : number of currently active credits
+    BUREAU_CLOSED_COUNT            : number of closed credits
+    BUREAU_MAX_OVERDUE_DAYS        : worst overdue days recorded at application
+    BUREAU_AMT_CREDIT_MAX_OVERDUE_SUM/MAX : aggregates of max overdue amount
+    BUREAU_AMT_CREDIT_SUM_OVERDUE_SUM/MAX : aggregates of current overdue amount
+    BUREAU_DEBT_RATIO              : total debt / total credit (bureau)
+    BUREAU_CREDIT_TYPE_COUNT       : diversity of credit types in history
+    BUREAU_DAYS_CREDIT_MAX         : days since most recent bureau credit opened
+
+    Bureau Balance features
+    -----------------------
+    BB_DELINQUENT_MONTHS_TOTAL  : total months with any DPD (STATUS 1-5)
+    BB_SEVERE_MONTHS_TOTAL      : total months with STATUS = 5 (120+ DPD)
+    BB_MAX_DPD_EVER             : worst DPD bucket ever recorded
+    BB_DELINQUENT_PROP_MEAN     : mean proportion of delinquent months per loan
+    """
+    print("  Aggregating bureau features...")
+
+    # ── Bureau-level ─────────────────────────────────────────────────────────
+    bur = bureau_df.copy()
+    bur["IS_ACTIVE"] = (bur["CREDIT_ACTIVE"] == "Active").astype(int)
+    bur["IS_CLOSED"] = (bur["CREDIT_ACTIVE"] == "Closed").astype(int)
+
+    bureau_agg = (
+        bur.groupby("SK_ID_CURR")
+        .agg(
+            BUREAU_LOAN_COUNT=("SK_ID_BUREAU", "count"),
+            BUREAU_ACTIVE_COUNT=("IS_ACTIVE", "sum"),
+            BUREAU_CLOSED_COUNT=("IS_CLOSED", "sum"),
+            BUREAU_MAX_OVERDUE_DAYS=("CREDIT_DAY_OVERDUE", "max"),
+            BUREAU_AMT_CREDIT_MAX_OVERDUE_SUM=("AMT_CREDIT_MAX_OVERDUE", "sum"),
+            BUREAU_AMT_CREDIT_MAX_OVERDUE_MAX=("AMT_CREDIT_MAX_OVERDUE", "max"),
+            BUREAU_AMT_CREDIT_SUM_OVERDUE_SUM=("AMT_CREDIT_SUM_OVERDUE", "sum"),
+            BUREAU_AMT_CREDIT_SUM_OVERDUE_MAX=("AMT_CREDIT_SUM_OVERDUE", "max"),
+            BUREAU_CREDIT_SUM_TOTAL=("AMT_CREDIT_SUM", "sum"),
+            BUREAU_CREDIT_SUM_DEBT_TOTAL=("AMT_CREDIT_SUM_DEBT", "sum"),
+            BUREAU_CREDIT_TYPE_COUNT=("CREDIT_TYPE", "nunique"),
+            BUREAU_DAYS_CREDIT_MAX=("DAYS_CREDIT", "max"),
+        )
+        .reset_index()
+    )
+
+    eps = 1e-9
+    bureau_agg["BUREAU_DEBT_RATIO"] = bureau_agg["BUREAU_CREDIT_SUM_DEBT_TOTAL"] / (
+        bureau_agg["BUREAU_CREDIT_SUM_TOTAL"] + eps
+    )
+
+    # ── Bureau Balance ────────────────────────────────────────────────────────
+    if bureau_balance_df is not None and len(bureau_balance_df) > 0:
+        print("  Aggregating bureau balance features...")
+        bb = bureau_balance_df.copy()
+
+        # Map STATUS to numeric DPD bucket
+        # '0'=current, '1'-'5'=months late, 'C'=closed, 'X'=unknown
+        status_map = {
+            "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+            "C": 0, "X": np.nan,
+        }
+        bb["STATUS_NUMERIC"] = bb["STATUS"].map(status_map)
+        bb["IS_DELINQUENT"] = bb["STATUS"].isin(["1", "2", "3", "4", "5"]).astype(int)
+        bb["IS_SEVERE"] = (bb["STATUS"] == "5").astype(int)
+
+        # Aggregate per bureau loan
+        bb_per_loan = (
+            bb.groupby("SK_ID_BUREAU")
+            .agg(
+                BB_DELINQUENT_MONTHS=("IS_DELINQUENT", "sum"),
+                BB_SEVERE_MONTHS=("IS_SEVERE", "sum"),
+                BB_MAX_DPD=("STATUS_NUMERIC", "max"),
+                BB_TOTAL_MONTHS=("MONTHS_BALANCE", "count"),
+            )
+            .reset_index()
+        )
+        bb_per_loan["BB_DELINQUENT_PROP"] = bb_per_loan["BB_DELINQUENT_MONTHS"] / (
+            bb_per_loan["BB_TOTAL_MONTHS"] + eps
+        )
+
+        # Map SK_ID_BUREAU → SK_ID_CURR via bureau index
+        id_map = bureau_df[["SK_ID_CURR", "SK_ID_BUREAU"]].copy()
+        bb_with_curr = id_map.merge(bb_per_loan, on="SK_ID_BUREAU", how="left")
+
+        bb_per_curr = (
+            bb_with_curr.groupby("SK_ID_CURR")
+            .agg(
+                BB_DELINQUENT_MONTHS_TOTAL=("BB_DELINQUENT_MONTHS", "sum"),
+                BB_SEVERE_MONTHS_TOTAL=("BB_SEVERE_MONTHS", "sum"),
+                BB_MAX_DPD_EVER=("BB_MAX_DPD", "max"),
+                BB_DELINQUENT_PROP_MEAN=("BB_DELINQUENT_PROP", "mean"),
+            )
+            .reset_index()
+        )
+
+        bureau_agg = bureau_agg.merge(bb_per_curr, on="SK_ID_CURR", how="left")
+
+    return bureau_agg
+
 
 class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
     """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
