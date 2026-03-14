@@ -614,21 +614,55 @@ def build_sklearn_pipeline():
         remainder='passthrough'
     )
 
-    return Pipeline([('cleanup', cleanup_pipeline), ('preprocessor', preprocessor)
-    ])
+    return Pipeline([('cleanup', cleanup_pipeline), ('preprocessor', preprocessor)])
 
-    print("Fitting and transforming training data...")
-    X_train_processed = full_pipeline.fit_transform(X_train)
-    
-    # Save processed training data and labels
-    joblib.dump(X_train_processed, os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
-    joblib.dump(y_train, os.path.join(FEATURE_ENG_DIR, "y_train.joblib"))
-    joblib.dump(train_ids, os.path.join(FEATURE_ENG_DIR, "train_ids.joblib"))
-    
-    # Save the fitted pipeline
-    joblib.dump(full_pipeline, os.path.join(MODEL_DIR, "preprocessing_pipeline.pkl"))
-    
-    del X_train, X_train_processed, y_train, train_ids
+
+# ===========================================================================
+# MAIN ORCHESTRATION
+# ===========================================================================
+
+
+def preprocess_data():
+    """
+    Full end-to-end preprocessing and feature engineering pipeline.
+
+    Steps
+    -----
+    1. Load application train + test
+    2. Engineer application-level ratio features  (Issue #4)
+    3. Aggregate supplementary tables             (Issue #4)
+    4. Merge into a unified feature matrix        (Issue #4)
+    5. Fit sklearn pipeline on train, transform both (Issue #3)
+    6. Save all artefacts
+    """
+    sep = "=" * 65
+
+    # ── Step 1: Load application data ────────────────────────────────────────
+    print(f"\n{sep}\nSTEP 1 — Loading application data\n{sep}")
+
+    train_df = pd.read_csv(
+        os.path.join(DATA_DIR, "application_train.csv"), low_memory=False
+    )
+    print("Train application loaded:")
+    train_df = reduce_mem_usage(train_df)
+
+    y_train = train_df["TARGET"].copy()
+    train_ids = train_df["SK_ID_CURR"].copy()
+
+    test_df = pd.read_csv(
+        os.path.join(DATA_DIR, "application_test.csv"), low_memory=False
+    )
+    print("Test application loaded:")
+    test_df = reduce_mem_usage(test_df)
+    test_ids = test_df["SK_ID_CURR"].copy()
+
+    # Combine train + test for consistent feature engineering (no target leakage)
+    test_df["TARGET"] = np.nan
+    combined_df = pd.concat([train_df, test_df], ignore_index=True)
+    del train_df, test_df
+    gc.collect()
+    print(f"Combined shape: {combined_df.shape}")
+
     gc.collect()
 
     # ── Step 5: Fit sklearn pipeline on train; transform both ─────────────────
@@ -658,6 +692,7 @@ def build_sklearn_pipeline():
     print(f"  X_test_processed  : {X_test_processed.shape}")
     print(f"\nAll artefacts saved to '{FEATURE_ENG_DIR}' and '{MODEL_DIR}'.")
     print("\n✓  Preprocessing + Feature Engineering complete.")
+
 
 if __name__ == "__main__":
     preprocess_data()
