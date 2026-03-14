@@ -580,32 +580,15 @@ class IncomeTransformer(BaseEstimator, TransformerMixin):
             )
         return X
 
-            
 
-class OwnCarAgeImputer(BaseEstimator, TransformerMixin):
+def build_sklearn_pipeline():
     """
-    Imputes missing values in 'OWN_CAR_AGE' with 0.
+    Build the full sklearn preprocessing pipeline:
+      1. Cleanup  (anomaly fix, impute OWN_CAR_AGE, time vars, log income)
+      2. ColumnTransformer
+           numeric  → median imputation (with missing indicator)
+           categoric → constant imputation + one-hot encoding
     """
-    def fit(self, X, y=None): return self
-    def transform(self, X):
-        X = X.copy()
-        if 'OWN_CAR_AGE' in X.columns:
-            X['OWN_CAR_AGE'] = X['OWN_CAR_AGE'].fillna(0)
-        return X
-
-def preprocess_data():
-    print("Loading training data...")
-    train_df = pd.read_csv(os.path.join(DATA_DIR, "application_train.csv"), low_memory=False)
-    train_df = reduce_mem_usage(train_df)
-    
-    y_train = train_df['TARGET'].copy()
-    train_ids = train_df['SK_ID_CURR'].copy()
-    X_train = train_df.drop(columns=['TARGET', 'SK_ID_CURR'])
-    del train_df
-    gc.collect()
-
-    print("Building and fitting full pipeline...")
-    # 1. Cleanup components
     cleanup_pipeline = Pipeline([
         ('days_employed_fix', DaysEmployedAnomalyFixer()),
         ('own_car_age', OwnCarAgeImputer()),
@@ -613,17 +596,15 @@ def preprocess_data():
         ('income_log', IncomeTransformer())
     ])
 
-    # 2. Imputation and Encoding components
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median', add_indicator=True))
-    ])
-    categorical_transformer = Pipeline(steps=[
+    numeric_transformer = Pipeline(
+        [('imputer', SimpleImputer(strategy='median', add_indicator=True))]
+    )
+
+    categorical_transformer = Pipeline([
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=True, min_frequency=0.01))
+        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=True))
     ])
-    
-    # 3. Combine into full pipeline
-    # NOTE: We use specific column types to ensure consistency
+
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, make_column_selector(dtype_include=np.number)),
@@ -633,10 +614,7 @@ def preprocess_data():
         remainder='passthrough'
     )
 
-
-    full_pipeline = Pipeline([
-        ('cleanup', cleanup_pipeline),
-        ('preprocessor', preprocessor)
+    return Pipeline([('cleanup', cleanup_pipeline), ('preprocessor', preprocessor)
     ])
 
     print("Fitting and transforming training data...")
