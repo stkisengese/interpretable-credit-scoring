@@ -21,11 +21,16 @@ import numpy as np
 import os
 import joblib
 import gc
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder
+from scripts.custom_transformers import (
+    DaysEmployedAnomalyFixer,
+    OwnCarAgeImputer,
+    TimeVariableTransformer,
+    IncomeTransformer,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -81,7 +86,7 @@ def reduce_mem_usage(df):
 
 
 # ===========================================================================
-# ISSUE #4 — FEATURE ENGINEERING FUNCTIONS
+# FEATURE ENGINEERING FUNCTIONS
 # ===========================================================================
 
 
@@ -529,58 +534,6 @@ def save_feature_descriptions(df, exclude_cols=("SK_ID_CURR", "TARGET")):
 # ===========================================================================
 
 
-class DaysEmployedAnomalyFixer(BaseEstimator, TransformerMixin):
-    """Replace the 365243 anomaly code in DAYS_EMPLOYED with NaN."""
-
-    def fit(self, X, y=None): return self
-
-    def transform(self, X):
-        X = X.copy()
-        if 'DAYS_EMPLOYED' in X.columns:
-            X['DAYS_EMPLOYED'] = X['DAYS_EMPLOYED'].replace(365243, np.nan)
-        return X
-
-
-class OwnCarAgeImputer(BaseEstimator, TransformerMixin):
-    """Impute OWN_CAR_AGE NaN with 0 — missing means no car."""
-
-    def fit(self, X, y=None): return self
-
-    def transform(self, X):
-        X = X.copy()
-        if 'OWN_CAR_AGE' in X.columns:
-            X['OWN_CAR_AGE'] = X['OWN_CAR_AGE'].fillna(0)
-        return X
-
-
-class TimeVariableTransformer(BaseEstimator, TransformerMixin):
-    """Convert DAYS_BIRTH / DAYS_EMPLOYED to positive years (if not yet done)."""
-
-    def fit(self, X, y=None): return self
-
-    def transform(self, X):
-        X = X.copy()
-        if 'DAYS_BIRTH' in X.columns and 'AGE_YEARS' not in X.columns:
-            X['AGE_YEARS'] = np.abs(X['DAYS_BIRTH'].astype(float)) / 365.0
-        if 'DAYS_EMPLOYED' in X.columns and 'YEARS_EMPLOYED' not in X.columns:
-            X['YEARS_EMPLOYED'] = np.abs(X['DAYS_EMPLOYED'].astype(float)) / 365.0
-        return X
-
-
-class IncomeTransformer(BaseEstimator, TransformerMixin):
-    """Log1p-transform AMT_INCOME_TOTAL to reduce right skew."""
-
-    def fit(self, X, y=None): return self
-
-    def transform(self, X):
-        X = X.copy()
-        if 'AMT_INCOME_TOTAL' in X.columns:
-            X['AMT_INCOME_TOTAL_LOG'] = np.log1p(
-                X['AMT_INCOME_TOTAL'].astype(float)
-            )
-        return X
-
-
 def build_sklearn_pipeline():
     """
     Build the full sklearn preprocessing pipeline:
@@ -629,10 +582,10 @@ def preprocess_data():
     Steps
     -----
     1. Load application train + test
-    2. Engineer application-level ratio features  (Issue #4)
-    3. Aggregate supplementary tables             (Issue #4)
-    4. Merge into a unified feature matrix        (Issue #4)
-    5. Fit sklearn pipeline on train, transform both (Issue #3)
+    2. Engineer application-level ratio features
+    3. Aggregate supplementary tables
+    4. Merge into a unified feature matrix
+    5. Fit sklearn pipeline on train, transform both
     6. Save all artefacts
     """
     sep = "=" * 65
