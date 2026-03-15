@@ -3,3 +3,4 @@
 .vscode
 *.joblib
 *.pkl
+*.pyc
