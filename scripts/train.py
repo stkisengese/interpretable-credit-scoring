@@ -129,3 +129,49 @@ def load_data():
     print(f"  Positives: {y_train.mean():.2%}")
     return X_train, X_test, y_train, test_ids
 
+
+# ===========================================================================
+# STEP 1 — LOGISTIC REGRESSION BASELINE
+# ===========================================================================
+
+def train_baseline(X: np.ndarray, y: np.ndarray) -> list[float]:
+    """
+    5-fold stratified CV baseline with logistic regression.
+
+    """
+    _print_header("Baseline — Logistic Regression (5-fold CV)")
+
+    # Scale once; LR is sensitive to feature magnitude
+    scaler = MaxAbsScaler()
+    X_sc   = scaler.fit_transform(X)
+    del scaler; gc.collect()
+
+    # Replace any surviving NaNs (HGBC tolerates them; LR does not)
+    col_med = np.nanmedian(X_sc, axis=0)
+    nan_mask = np.isnan(X_sc)
+    X_sc[nan_mask] = np.take(col_med, np.where(nan_mask)[1])
+    del col_med, nan_mask
+
+    lr = LogisticRegression(
+        penalty      = "l2",
+        C            = 0.1,
+        class_weight = "balanced",
+        solver       = "saga",
+        max_iter     = 300,
+        random_state = RANDOM_STATE,
+        n_jobs       = 1,          # single-threaded — avoids subprocess copies
+    )
+
+    skf  = StratifiedKFold(N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    aucs = []
+    for fold, (tr, val) in enumerate(skf.split(X_sc, y), 1):
+        lr.fit(X_sc[tr], y[tr])
+        prob = lr.predict_proba(X_sc[val])[:, 1]
+        auc  = roc_auc_score(y[val], prob)
+        aucs.append(auc)
+        print(f"  Fold {fold}: AUC = {auc:.4f}")
+
+    del X_sc, lr; gc.collect()
+    print(f"\n  Baseline CV AUC: {_auc_str(aucs)}")
+    return aucs
+
