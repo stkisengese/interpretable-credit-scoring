@@ -176,3 +176,22 @@ def plot_builtin_importance(model, feature_names: np.ndarray, top_n: int = 30):
 
     return importances
 
+
+# =============================================================================
+# STEP 4 — GLOBAL SHAP / PERMUTATION IMPORTANCE
+# =============================================================================
+
+def _compute_shap(model, X_sample, y_sample, feature_names):
+    """Compute SHAP values using TreeExplainer (requires shap package)."""
+    print(f"  Using shap.TreeExplainer on {len(X_sample)} samples …")
+    bg_n  = min(200, len(X_sample))
+    bg    = shap.sample(X_sample, bg_n, random_state=RANDOM_STATE)
+    explainer  = shap.TreeExplainer(model, bg)
+    shap_vals  = explainer.shap_values(X_sample)
+    if isinstance(shap_vals, list):
+        shap_vals = shap_vals[1]
+    base_val = explainer.expected_value
+    if isinstance(base_val, (list, np.ndarray)):
+        base_val = float(base_val[1])
+    return shap_vals.astype(np.float32), float(base_val)
+
