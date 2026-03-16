@@ -223,3 +223,29 @@ def train_primary_model(X: np.ndarray, y: np.ndarray):
 
     return oof_preds, fold_aucs, models, iters_per_fold
 
+
+# ===========================================================================
+# STEP 3 — RETRAIN FINAL MODEL
+# ===========================================================================
+
+def retrain_final_model(X: np.ndarray, y: np.ndarray,
+                        iters_per_fold: list[int]) -> HistGradientBoostingClassifier:
+    """
+    Retrain on the full training set using the mean early-stopping iteration
+    count from CV — prevents overfitting without wasting labelled data.
+    """
+    _print_header("Retraining final model on full dataset")
+
+    best_n_iter = int(np.mean(iters_per_fold))
+    print(f"  Mean early-stopping n_iter across folds: {best_n_iter}")
+
+    # Drop early-stopping keys — they are incompatible with fixed max_iter
+    _drop = {"early_stopping", "n_iter_no_change", "validation_fraction", "scoring"}
+    final_params = {k: v for k, v in HGBC_PARAMS.items() if k not in _drop}
+    final_params.update({"max_iter": best_n_iter, "early_stopping": False})
+
+    model = HistGradientBoostingClassifier(**final_params)
+    model.fit(X, y)
+    print(f"  Final model trained — n_iter = {model.n_iter_}")
+    return model
+
