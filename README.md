@@ -1,38 +1,184 @@
-# Credit Scoring — Interpretable Risk Prediction
+# Interpretable Credit Scoring — Home Credit Default Risk
 
 ## Overview
-This project aims to develop a credit scoring model using the Home Credit dataset to predict the probability of loan default. The primary focus is on **interpretability**, ensuring that credit decisions are transparent and explainable to both regulators and customers.
+This project builds an interpretable credit-scoring pipeline for predicting loan default probability using the [Home Credit dataset](https://www.kaggle.com/c/home-credit-default-risk). The primary focus is on **interpretability**, ensuring that credit decisions are transparent and explainable to both regulators and customers.
 
-## Key Features
-- **Exploratory Data Analysis (EDA):** Deep dive into client data and historical credit records.
-- **Predictive Modelling:** Gradient boosting models targeting an AUC-ROC ≥ 55% (goal ≥ 62%).
-- **Explainable AI (XAI):** Global and local explanations using SHAP values.
-- **Interactive Dashboards:** Visualising client risk profiles and feature contributions.
+**Kaggle username:** `skisenge01edukisumu`
+**Final Kaggle AUC:** _0.77886_ (OOF AUC on local validation — submit `results/model/submission.csv` to record official score)
 
-## Repository Structure
-- `data/`: Contains the Home Credit datasets (CSV).
-- `scripts/`: Core Python scripts for preprocessing, training, and prediction.
-- `results/`: Model artifacts, reports, and client-level visualizations.
-- `requirements.txt`: Project dependencies.
-- `username.txt`: Project identifier.
+The full pipeline covers:
 
-## How to Run
-1. **Setup Environment:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. **Preprocessing:**
-   ```bash
-   python scripts/preprocess.py
-   ```
-3. **Training:**
-   ```bash
-   python scripts/train.py
-   ```
-4. **Scoring / Prediction:**
-   ```bash
-   python scripts/predict.py --client_id <SK_ID_CURR>
-   ```
+| Stage | Script |
+|---|---|
+| Preprocessing & Feature Engineering | `scripts/preprocess.py` |
+| Model Training & Validation | `scripts/train.py` |
+| Global Interpretability | `scripts/explain_global.py` |
+| Client Scoring & Local Explanations | `scripts/predict.py` |
+| Interactive Dashboard | `dashboard.py` |
 
-## Username
-Project kaggle identifier: **skisenge01edukisumu**
+---
+
+## Quick Start
+
+### 1 — Clone and install dependencies
+
+```bash
+git clone https://github.com/stkisengese/interpretable-credit-scoring.git
+cd interpretable-credit-scoring
+python -m venv .venv && source .venv/bin/activate   # Linux / macOS
+# .venv\Scripts\activate                            # Windows
+pip install -r requirements.txt
+```
+
+### 2 — Download the data
+
+Download all CSV files from the [Kaggle competition data page](https://www.kaggle.com/c/home-credit-default-risk/data)
+and place them in the `data/` directory:
+
+```bash
+wget https://assets.01-edu.org/ai-branch/project5/home-credit-default-risk.zip
+unzip home-credit-default-risk.zip -d data/
+rm home-credit-default-risk.zip
+```
+**Expected Output:**
+```
+data/
+  application_train.csv
+  application_test.csv
+  bureau.csv
+  bureau_balance.csv
+  previous_application.csv
+  installments_payments.csv
+  credit_card_balance.csv
+  POS_CASH_balance.csv
+```
+
+### 3 — Run the full pipeline
+
+```bash
+# Step 1: Feature engineering + preprocessing (~10 min)
+python scripts/preprocess.py
+
+# Step 2: Train model + evaluation plots (~15 min)
+python scripts/train.py
+
+# Step 3: Global interpretability (feature importance + SHAP)
+python scripts/explain_global.py
+
+# Step 4: Score clients + generate PDF reports
+python scripts/predict.py --run_all         # 3 required client reports
+python scripts/predict.py --client_id 100002              # single client
+python scripts/predict.py --client_id 100002 --save_pdf   # with PDF
+
+# Step 5: Launch dashboard
+python dashboard.py
+```
+
+---
+
+## Model Details
+
+### Algorithm
+
+**HistGradientBoostingClassifier** (sklearn's histogram-based gradient
+boosting — functionally equivalent to LightGBM).
+
+To switch to LightGBM in production:
+```python
+# In scripts/train.py, replace:
+from sklearn.ensemble import HistGradientBoostingClassifier
+# with:
+from lightgbm import LGBMClassifier
+```
+
+### Key Hyperparameters
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| `learning_rate` | 0.05 | Slow learning, more trees, better generalisation |
+| `max_leaf_nodes` | 63 | Equivalent to LightGBM `num_leaves=63` |
+| `min_samples_leaf` | 20 | Prevents over-fitting on rare patterns |
+| `l2_regularization` | 0.1 | Shrinks leaf weights |
+| `max_features` | 0.8 | Column sub-sampling (80%) |
+| `class_weight` | balanced | Handles the 8% default-rate imbalance |
+| Early stopping | patience=50 | Stops when val AUC stops improving |
+
+### Performance
+
+| Metric | Score |
+|---|---|
+| Baseline LR OOF AUC | ~0.76 |
+| HGBC OOF AUC (5-fold CV) | ~0.78 |
+| Target AUC | ≥ 0.62 ✓ |
+
+### Why AUC, not accuracy?
+
+With only ~8% defaulters, a model that predicts "no default" for everyone
+achieves ~92% accuracy while providing **zero predictive value**. AUC-ROC
+measures the model's ability to *rank* risky applicants independently of
+any threshold, making it the correct metric for this imbalanced task.
+
+---
+
+## Feature Engineering
+
+The pipeline engineers **417 features** from 8 source tables:
+
+| Category | Features |
+|---|---|
+| Application ratios | `CREDIT_INCOME_RATIO`, `ANNUITY_INCOME_RATIO`, `EXT_SOURCE_MEAN/MIN/PROD`, … (14 total) |
+| Bureau aggregations | `BUREAU_MAX_OVERDUE_DAYS`, `BUREAU_DEBT_RATIO`, `BB_SEVERE_MONTHS_TOTAL`, … (17 total) |
+| Installment payments | `INST_PAYMENT_DELAY_MEAN/MAX`, `INST_LATE_PAYMENT_COUNT`, … (7 total) |
+| Credit card balance | `CC_UTILISATION_MEAN/MAX`, `CC_DPD_MAX`, … (6 total) |
+| POS/Cash balance | `POS_DPD_COUNT/MAX`, `POS_INSTALMENT_REMAINING_MEAN` (3 total) |
+| Previous applications | `PREV_APPROVAL_RATE`, `PREV_REFUSED_COUNT`, … (8 total) |
+| OHE categoricals | One-hot encoded from all categorical columns |
+
+All aggregations are left-joined on `SK_ID_CURR` so every applicant is preserved regardless of whether they have supplementary table records.
+
+---
+
+## Client Reports
+
+Three required PDF reports are generated by `python scripts/predict.py --run_all`:
+
+1. **`client1_correct_train.pdf`** — A training-set client the model predicted
+   correctly. The waterfall and factors charts show which features drove the
+   correct score.
+
+2. **`client2_wrong_train.pdf`** — A training-set client the model
+   misclassified (false negative or false positive). The report includes an
+   automated error analysis explaining likely reasons for the mistake.
+
+3. **`client_test.pdf`** — A test-set client (true label unknown). Shows the
+   model's prediction and all supporting evidence as would be presented to a
+   credit officer.
+
+---
+
+## Interpretability & Fairness
+
+- **Global:** Gain-based importance + SHAP beeswarm (`explain_global.py`)
+- **Local:** SHAP waterfall per client (`predict.py`)
+- **Regulatory check:** Automated keyword scan for protected attributes
+  (`results/interpretability/feature_narrative.txt`)
+
+⚠️ **Proxy discrimination caveat:** Features like `EMPLOYMENT_RATIO` and
+`CREDIT_INCOME_RATIO` are facially neutral but may correlate with protected
+classes. A full disparate-impact audit (e.g., using [Fairlearn](https://fairlearn.org/)
+or [AIF360](https://aif360.readthedocs.io/)) is required before production
+deployment.
+
+---
+
+## License
+[MIT License](/LICENSE)
+
+---
+
+## Author
+[Stephen Kisengese](https://github.com/stkisengese)
+
+---
+
+*Project by skisenge01edukisumu — Interpretable Credit Scoring, 2026*
