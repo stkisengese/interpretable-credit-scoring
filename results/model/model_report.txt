@@ -1,0 +1,118 @@
+HOME CREDIT DEFAULT RISK — MODEL REPORT
+========================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. ALGORITHM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Primary model: sklearn HistGradientBoostingClassifier
+(histogram-based gradient boosting — functionally equivalent to LightGBM)
+
+Key hyperparameters
+-------------------
+learning_rate    : 0.05
+max_leaf_nodes   : 63     (≈ LightGBM num_leaves=63)
+min_samples_leaf : 20     (minimum data per leaf — reduces overfitting)
+l2_regularization: 0.1   (L2 shrinkage on leaf values)
+max_features     : 0.8    (column sub-sampling — reduces variance)
+early_stopping   : True   (patience=50 rounds on 10 % internal val set)
+class_weight     : balanced  (up-weights the 8 % minority class)
+
+Why gradient boosting?
+• Handles mixed numeric/categorical data natively
+• Captures non-linear interactions that logistic regression cannot
+• Robust to outliers via histogram binning
+• Tolerates missing values internally
+• Produces well-calibrated probability scores for applicant ranking
+
+Baseline vs primary
+-------------------
+  Logistic Regression CV AUC : 0.7604 ± 0.0047
+  Gradient Boosting OOF AUC  : 0.7803 ± 0.0036
+  Improvement                : +0.0199 AUC points
+
+Cross-validation
+----------------
+Stratified 5-fold CV preserves the 8 % default-class ratio in every fold.
+OOF (out-of-fold) predictions are assembled across all folds for an honest
+evaluation that cannot leak test-set information.
+
+OOF AUC  : 0.7802
+
+Early stopping detail
+---------------------
+Mean n_iter across folds : 260
+Range                    : 234 – 297
+
+The production model is retrained on the full training set using the mean
+early-stopping iteration count, preventing overfitting while using all data.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. WHY ACCURACY IS NOT THE RIGHT METRIC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Class distribution:
+  No default (TARGET=0): ~91.9 %
+  Default    (TARGET=1): ~ 8.1 %
+
+A trivial model predicting "no default" for every applicant scores ≈91.9 %
+accuracy while being completely useless.  This is the base-rate fallacy.
+
+AUC-ROC is the correct metric because:
+  1. It measures the probability that a randomly chosen defaulter is scored
+     higher than a randomly chosen non-defaulter — directly useful for ranking.
+  2. It evaluates the model across ALL possible thresholds, not one fixed cut.
+  3. It is insensitive to class imbalance.
+
+Confusion matrix at Youden-optimal threshold (τ = 0.466)
+--------------------------------------------------------------
+  True Negatives  (correct non-default):    205,286
+  False Positives (wrong approval deny) :     77,400
+  False Negatives (missed defaults)     :      7,592
+  True Positives  (correct default)     :     17,233
+
+  Sensitivity (recall of defaults) : 69.42%
+  Specificity                       : 72.62%
+  Precision on predicted defaults   : 18.21%
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. LIMITS AND POSSIBLE IMPROVEMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Data limitations
+----------------
+• No access to labelled test set; Kaggle public leaderboard is the sole
+  external AUC signal.
+• Historical snapshot — model may suffer concept drift as economic
+  conditions and lending policies change over time.
+• Protected attributes (gender, age) are present; a fairness audit is
+  required before production deployment.
+
+Model limitations
+-----------------
+• HGBC lacks native SHAP support; a TreeExplainer approximation is used.
+• Hyperparameters were manually tuned; Bayesian optimisation (Optuna)
+  would improve AUC further without extra data.
+• Feature interactions are implicit; explicit polynomial features or
+  entity-embedding layers for high-cardinality categoricals could help.
+
+Possible improvements
+---------------------
+• Switch to LightGBM or XGBoost for faster training, leaf-wise growth,
+  and native SHAP.
+• Stack/blend gradient boosting with a neural network using embeddings.
+• Add macroeconomic context features (interest rates, unemployment).
+• Adversarial validation to detect train/test distribution shift.
+• SMOTE or target-encoded features for the minority class.
+• Model EXT_SOURCE missingness with a dedicated imputation model.
+
+Overfitting measures taken
+---------------------------
+• L2 regularisation (l2_regularization=0.1)
+• Column sub-sampling (max_features=0.8)
+• Leaf-level constraints (min_samples_leaf=20)
+• Early stopping (patience=50 on 10 % internal validation split)
+• Stratified 5-fold OOF evaluation (no test-set leakage)
+• Learning curves (see learning_curves.png) confirm negligible overfitting gap
