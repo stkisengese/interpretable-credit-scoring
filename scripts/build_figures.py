@@ -250,3 +250,57 @@ def plot_score_gauge(prediction: float, client_id: int) -> plt.Figure:
     ax.set_title(f"Client {client_id} — Credit Risk Score", fontsize=11, pad=8)
     plt.tight_layout()
     return fig
+
+
+# =============================================================================
+# PANEL E — TOP FACTORS  (Panel 4 in spec)
+# =============================================================================
+
+def plot_top_factors(
+    contributions: np.ndarray, feature_names: np.ndarray,
+    client_id: int, prediction: float, top_n: int = 10,
+) -> plt.Figure:
+    """
+    Horizontal bar chart of the top positive and negative SHAP contributions.
+    Red = factors that raise default probability, Blue = factors that lower it.
+    """
+    n = min(len(contributions), len(feature_names))
+    c = contributions[:n]
+    f = feature_names[:n]
+
+    # Top positive and top negative contributors (balanced)
+    half = top_n // 2
+    pos_idx = np.argsort(c)[-half:][::-1]
+    neg_idx = np.argsort(c)[:half]
+    idx = np.concatenate([neg_idx, pos_idx])
+    idx = idx[np.argsort(c[idx])]          # sort ascending for display
+
+    vals  = c[idx]
+    names = f[idx]
+    colors = ["#3498db" if v < 0 else "#e74c3c" for v in vals]
+
+    fig, ax = plt.subplots(figsize=(9, max(5, len(idx) * 0.45)))
+    ax.barh(range(len(idx)), vals, color=colors, edgecolor="white", lw=0.5)
+    ax.axvline(0, color="black", lw=0.8)
+
+    for i, (v, nm) in enumerate(zip(vals, names)):
+        offset = 0.0005 if v >= 0 else -0.0005
+        ha = "left" if v >= 0 else "right"
+        ax.text(v + offset, i, f"{v:+.4f}", ha=ha, va="center", fontsize=7)
+
+    ax.set_yticks(range(len(idx)))
+    ax.set_yticklabels(names, fontsize=9)
+    ax.set_xlabel("Feature contribution to default probability")
+    ax.set_title(
+        f"Client {client_id} — Top Positive & Negative Factors\n"
+        f"Score: {prediction:.1%}  "
+        f"({'↑ Increases' if prediction > 0.5 else '↓ Decreases'} default risk vs average)"
+    )
+    legend_els = [
+        mpatches.Patch(color="#e74c3c", label="Raises default risk"),
+        mpatches.Patch(color="#3498db", label="Lowers default risk"),
+    ]
+    ax.legend(handles=legend_els, fontsize=8)
+    ax.grid(axis="x", alpha=0.3)
+    plt.tight_layout()
+    return fig
