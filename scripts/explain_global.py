@@ -72,3 +72,28 @@ N_SHAP_SAMPLES  = 2_000   # rows used for global SHAP computation
 N_PERM_SAMPLES  = 3_000   # rows used for permutation importance (fallback)
 N_PERM_REPEATS  = 5       # repeats for permutation importance
 
+
+# =============================================================================
+# STEP 1 — LOAD ARTEFACTS
+# =============================================================================
+
+def load_artifacts():
+    _print_header("Loading artefacts")
+
+    model    = joblib.load(os.path.join(MODEL_DIR, "my_own_model.pkl"))
+    pipeline = joblib.load(os.path.join(MODEL_DIR, "preprocessing_pipeline.pkl"))
+    X_train  = _dense_float32(
+        joblib.load(os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
+    )
+    y_train  = np.asarray(
+        joblib.load(os.path.join(FEATURE_ENG_DIR, "y_train.joblib")),
+        dtype=np.int8,
+    )
+
+    mem_gb = X_train.nbytes / 1024**3
+    print(f"  X_train : {X_train.shape}  ({mem_gb:.2f} GB float32)")
+    print(f"  Positives: {y_train.mean():.2%}")
+    print(f"  SHAP library: {'available ✓' if SHAP_AVAILABLE else 'NOT installed — using permutation importance'}")
+
+    return model, pipeline, X_train, y_train
+
