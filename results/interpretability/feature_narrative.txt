@@ -1,0 +1,66 @@
+HOME CREDIT DEFAULT RISK — GLOBAL FEATURE IMPORTANCE NARRATIVE
+=================================================================
+
+Analysis method: SHAP TreeExplainer
+Top 10 features ranked by mean absolute impact on predicted
+default probability (higher = more influential).
+
+ 1. EXT_SOURCE_MEAN
+    Avg impact : 0.45791
+    Direction  : ↑ increases default risk
+    Meaning    : Mean of three external credit bureau scores (strong negative predictor: higher scores = safer applicants)
+
+ 2. CREDIT_TERM
+    Avg impact : 0.12234
+    Direction  : ↓ decreases default risk
+    Meaning    : Estimated loan term in months (credit / annuity)
+
+ 3. GOODS_CREDIT_RATIO
+    Avg impact : 0.11279
+    Direction  : ↓ decreases default risk
+    Meaning    : Goods price / credit amount — collateral coverage
+
+ 4. POS_INSTALMENT_REMAINING_MEAN
+    Avg impact : 0.10617
+    Direction  : ↑ increases default risk
+    Meaning    : (no description — engineered/OHE feature)
+
+ 5. AMT_ANNUITY
+    Avg impact : 0.08882
+    Direction  : ↑ increases default risk
+    Meaning    : (no description — engineered/OHE feature)
+
+ 6. INST_PAYMENT_RATIO_MEAN
+    Avg impact : 0.08368
+    Direction  : ↑ increases default risk
+    Meaning    : (no description — engineered/OHE feature)
+
+ 7. CODE_GENDER_M
+    Avg impact : 0.08182
+    Direction  : ↓ decreases default risk
+    Meaning    : (no description — engineered/OHE feature)
+    ⚠️  REGULATORY FLAG: feature name suggests possible protected attribute.
+
+ 8. NAME_FAMILY_STATUS_Married
+    Avg impact : 0.07276
+    Direction  : ↑ increases default risk
+    Meaning    : (no description — engineered/OHE feature)
+
+ 9. NAME_EDUCATION_TYPE_Higher education
+    Avg impact : 0.06959
+    Direction  : ↑ increases default risk
+    Meaning    : (no description — engineered/OHE feature)
+
+10. BUREAU_DEBT_RATIO
+    Avg impact : 0.06569
+    Direction  : ↑ increases default risk
+    Meaning    : Bureau debt-to-credit ratio
+
+=================================================================
+REGULATORY / FAIRNESS SUMMARY
+=================================================================
+⚠️  1 potentially protected feature(s) in top 10:
+   • CODE_GENDER_M
+
+   Action required: conduct a full disparate-impact analysis
+   under applicable fair-lending regulations before deployment.
