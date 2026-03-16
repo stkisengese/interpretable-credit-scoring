@@ -76,3 +76,74 @@ KEY_FEATURES = [
     "BUREAU_MAX_OVERDUE_DAYS",
     "INST_PAYMENT_DELAY_MAX",
 ]
+
+
+# =============================================================================
+# STEP 1 — LOAD ARTEFACTS
+# =============================================================================
+
+def load_artifacts() -> dict:
+    """
+    Load all artefacts produced by preprocess.py and train.py.
+
+    Returns a dict with keys:
+      model, pipeline, feature_names,
+      X_train, X_test, y_train, train_ids, test_ids,
+      oof_preds, raw_train, raw_test
+    """
+    print("Loading artefacts …")
+
+    model    = joblib.load(os.path.join(MODEL_DIR, "my_own_model.pkl"))
+    pipeline = joblib.load(os.path.join(MODEL_DIR, "preprocessing_pipeline.pkl"))
+
+    X_train  = _dense_float32(
+        joblib.load(os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib"))
+    )
+    X_test   = _dense_float32(
+        joblib.load(os.path.join(FEATURE_ENG_DIR, "X_test_processed.joblib"))
+    )
+    y_train  = np.asarray(
+        joblib.load(os.path.join(FEATURE_ENG_DIR, "y_train.joblib")), dtype=np.int8
+    )
+    train_ids = joblib.load(os.path.join(FEATURE_ENG_DIR, "train_ids.joblib"))
+    test_ids  = joblib.load(os.path.join(FEATURE_ENG_DIR, "test_ids.joblib"))
+
+    # OOF predictions (if train.py has been run)
+    oof_preds = None
+    oof_path  = os.path.join(MODEL_DIR, "oof_predictions.pkl")
+    if os.path.exists(oof_path):
+        d = joblib.load(oof_path)
+        oof_preds = d.get("oof_preds")
+
+    # Raw (pre-sklearn-pipeline) feature frames (if available)
+    raw_train = None
+    raw_test  = None
+    raw_train_path = os.path.join(FEATURE_ENG_DIR, "train_features_raw.pkl")
+    raw_test_path  = os.path.join(FEATURE_ENG_DIR, "test_features_raw.pkl")
+    if os.path.exists(raw_train_path):
+        raw_train = pd.read_pickle(raw_train_path)
+        print(f"  Raw train features loaded: {raw_train.shape}")
+    if os.path.exists(raw_test_path):
+        raw_test = pd.read_pickle(raw_test_path)
+        print(f"  Raw test  features loaded: {raw_test.shape}")
+
+    # Feature names
+    try:
+        ct    = pipeline.named_steps["preprocessor"]
+        names = ct.get_feature_names_out()
+        names = np.array(
+            [n.split("__", 1)[1] if "__" in n else n for n in names], dtype=object
+        )
+    except Exception:
+        names = np.array([f"feat_{i}" for i in range(X_train.shape[1])], dtype=object)
+
+    print(f"  X_train : {X_train.shape}  X_test : {X_test.shape}")
+    print(f"  Features: {len(names)}")
+
+    return dict(
+        model=model, pipeline=pipeline, feature_names=names,
+        X_train=X_train, X_test=X_test,
+        y_train=y_train, train_ids=train_ids, test_ids=test_ids,
+        oof_preds=oof_preds, raw_train=raw_train, raw_test=raw_test,
+    )
+
