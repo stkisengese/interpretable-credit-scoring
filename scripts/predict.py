@@ -147,3 +147,54 @@ def load_artifacts() -> dict:
         oof_preds=oof_preds, raw_train=raw_train, raw_test=raw_test,
     )
 
+
+# =============================================================================
+# STEP 2 — SCORE A SINGLE CLIENT
+# =============================================================================
+
+def get_client_data(client_id: int, art: dict):
+    """
+    Retrieve processed features and raw metadata for a specific client.
+
+    Returns
+    -------
+    X_client    : (1, n_features) float32  — processed features for prediction
+    raw_row     : pd.Series or None        — raw interpretable feature values
+    y_true      : int or None              — ground truth (None for test set)
+    oof_pred    : float or None            — OOF prediction (None for test set)
+    dataset     : 'train' or 'test'
+    row_idx     : int                      — row position in X_train / X_test
+    """
+    train_ids = np.asarray(art["train_ids"])
+    test_ids  = np.asarray(art["test_ids"])
+
+    # Locate client
+    in_train = client_id in train_ids
+    in_test  = client_id in test_ids
+
+    if in_train:
+        row_idx  = int(np.where(train_ids == client_id)[0][0])
+        X_client = art["X_train"][row_idx : row_idx + 1]
+        y_true   = int(art["y_train"][row_idx])
+        oof_pred = float(art["oof_preds"][row_idx]) if art["oof_preds"] is not None else None
+        raw_row  = (
+            art["raw_train"][art["raw_train"]["SK_ID_CURR"] == client_id].iloc[0]
+            if art["raw_train"] is not None else None
+        )
+        return X_client, raw_row, y_true, oof_pred, "train", row_idx
+
+    elif in_test:
+        row_idx  = int(np.where(test_ids == client_id)[0][0])
+        X_client = art["X_test"][row_idx : row_idx + 1]
+        raw_row  = (
+            art["raw_test"][art["raw_test"]["SK_ID_CURR"] == client_id].iloc[0]
+            if art["raw_test"] is not None else None
+        )
+        return X_client, raw_row, None, None, "test", row_idx
+
+    else:
+        raise ValueError(
+            f"Client {client_id} not found in train or test set.\n"
+            f"Train has {len(train_ids):,} clients, Test has {len(test_ids):,} clients."
+        )
+
