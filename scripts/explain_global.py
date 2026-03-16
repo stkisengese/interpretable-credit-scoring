@@ -97,3 +97,29 @@ def load_artifacts():
 
     return model, pipeline, X_train, y_train
 
+
+# =============================================================================
+# STEP 2 — FEATURE NAMES
+# =============================================================================
+
+def get_feature_names(pipeline, n_features: int) -> np.ndarray:
+    """
+    Extract human-readable feature names from the fitted sklearn pipeline.
+
+    The ColumnTransformer produces names like 'num__AMT_CREDIT' for numeric
+    features and 'cat__NAME_CONTRACT_TYPE_Cash loans' for OHE categories.
+    We strip the prefix so plots are readable.
+    """
+    try:
+        ct    = pipeline.named_steps["preprocessor"]
+        names = ct.get_feature_names_out()
+        # Strip 'num__' / 'cat__' / 'remainder__' prefixes
+        cleaned = []
+        for n in names:
+            cleaned.append(n.split("__", 1)[1] if "__" in n else n)
+        print(f"  Feature names extracted: {len(cleaned)}")
+        return np.array(cleaned, dtype=object)
+    except Exception as exc:
+        print(f"  WARNING: could not extract feature names ({exc})")
+        return np.array([f"feat_{i}" for i in range(n_features)], dtype=object)
+
