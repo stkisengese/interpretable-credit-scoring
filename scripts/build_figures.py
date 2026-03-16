@@ -8,9 +8,7 @@ from utils import (
     _risk_color, _risk_label, _wrap, RISK_BANDS
 )
 
-# ── Config ────────────────────────────────────────────────────────────────────
 RANDOM_STATE   = 42
-N_BG_SAMPLES   = 300    # background samples for local SHAP approximation
 WATERFALL_TOP  = 15     # features shown in waterfall
 
 # =============================================================================
