@@ -101,3 +101,31 @@ def save_figure(fig: plt.Figure, filename: str):
     plt.close(fig)
     print(f"  Saved → {path}")
 
+
+# ===========================================================================
+# DATA LOADING
+# ===========================================================================
+
+def load_data():
+    """
+    Load preprocessed feature matrices and cast to float32 immediately.
+    Halves the resident memory: 307 k × 417 × 4 B ≈ 500 MB vs 1 GB.
+    """
+    _print_header("Loading preprocessed data")
+
+    X_train = _dense_f32(joblib.load(
+        os.path.join(FEATURE_ENG_DIR, "X_train_processed.joblib")))
+    X_test  = _dense_f32(joblib.load(
+        os.path.join(FEATURE_ENG_DIR, "X_test_processed.joblib")))
+    y_train  = np.asarray(
+        joblib.load(os.path.join(FEATURE_ENG_DIR, "y_train.joblib")),
+        dtype=np.int8)
+    test_ids = joblib.load(os.path.join(FEATURE_ENG_DIR, "test_ids.joblib"))
+
+    print(f"  X_train : {X_train.shape}  dtype={X_train.dtype}"
+          f"  ({X_train.nbytes/1e9:.2f} GB)")
+    print(f"  X_test  : {X_test.shape}  dtype={X_test.dtype}"
+          f"  ({X_test.nbytes/1e9:.2f} GB)")
+    print(f"  Positives: {y_train.mean():.2%}")
+    return X_train, X_test, y_train, test_ids
+
