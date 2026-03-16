@@ -149,3 +149,30 @@ def hgbc_gain_importance(model, n_features: int) -> np.ndarray:
     total = gains.sum()
     return gains / total if total > 0 else gains
 
+
+def plot_builtin_importance(model, feature_names: np.ndarray, top_n: int = 30):
+    """Bar chart of gain-based importance (top_n features)."""
+    _print_header("Gain-based feature importance")
+
+    n = min(model.n_iter_ and 1, 1)  # sanity
+    importances = hgbc_gain_importance(model, len(feature_names))
+
+    k     = min(top_n, len(importances))
+    idx   = np.argsort(importances)[-k:]
+    vals  = importances[idx]
+    names = feature_names[idx]
+
+    fig, ax = plt.subplots(figsize=(10, max(6, k * 0.32)))
+    palette = plt.cm.Blues(np.linspace(0.4, 0.9, k))
+    ax.barh(range(k), vals, color=palette, edgecolor="white", lw=0.4)
+    ax.set_yticks(range(k))
+    ax.set_yticklabels(names, fontsize=8)
+    ax.set_xlabel("Relative gain importance (normalised)")
+    ax.set_title(f"Top {k} Features — Gain-Based Importance\n"
+                 "HistGradientBoostingClassifier")
+    ax.grid(axis="x", alpha=0.3)
+    plt.tight_layout()
+    _save_fig(fig, "feature_importance_gain.png")
+
+    return importances
+
