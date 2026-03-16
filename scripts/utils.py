@@ -5,6 +5,7 @@
 import os
 import textwrap
 import numpy as np
+import pandas as pd
 import scipy.sparse as sp
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -255,3 +256,57 @@ def select_test_client(art: dict) -> int:
     cid = int(ids[0])
     print(f"  Test client: {cid}")
     return cid
+
+
+def _wrong_client_note(art: dict, client_id: int) -> str:
+    """Generate an analysis note explaining why the model got it wrong."""
+    ids   = np.asarray(art["train_ids"])
+    y     = art["y_train"]
+    preds = art["oof_preds"]
+    idx   = int(np.where(ids == client_id)[0][0])
+
+    actual = "Default" if y[idx] else "No Default"
+    score  = preds[idx]
+    predicted = "Default (≥0.5)" if score >= 0.5 else "No Default (<0.5)"
+
+    raw_row = None
+    if art["raw_train"] is not None:
+        mask = art["raw_train"]["SK_ID_CURR"] == client_id
+        if mask.any():
+            raw_row = art["raw_train"][mask].iloc[0]
+
+    note = (
+        f"Model predicted {predicted} (score={score:.4f}) but the true "
+        f"label is {actual}.  "
+    )
+
+    if actual == "Default" and score < 0.5:
+        # False negative
+        note += (
+            "This is a FALSE NEGATIVE (missed default).  "
+            "Potential reasons: the client may have disguised financial "
+            "stress through strong external bureau scores or a temporarily "
+            "stable repayment history, while underlying structural risk "
+            "(e.g., sudden income loss) was not captured by available features.  "
+            "Missing values in key predictors (EXT_SOURCE, employment history) "
+            "could also cause the model to underestimate risk."
+        )
+    else:
+        # False positive
+        note += (
+            "This is a FALSE POSITIVE (unnecessary denial).  "
+            "Potential reasons: the client may have unusual but legitimate "
+            "income patterns (e.g., self-employed) that appear risky under "
+            "the standard features, or a single negative bureau entry that "
+            "disproportionately drives the score despite overall good credit behaviour."
+        )
+
+    if raw_row is not None:
+        extras = []
+        for feat in ["EXT_SOURCE_MEAN", "CREDIT_INCOME_RATIO", "YEARS_EMPLOYED"]:
+            if feat in raw_row.index and pd.notna(raw_row[feat]):
+                extras.append(f"{feat}={raw_row[feat]:.3g}")
+        if extras:
+            note += f"  Key feature values: {', '.join(extras)}."
+
+    return note
