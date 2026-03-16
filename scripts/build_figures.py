@@ -1,6 +1,11 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+
+from utils import (
+    _risk_color,
+)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 RANDOM_STATE   = 42
@@ -80,4 +85,51 @@ def plot_waterfall(
     ax.grid(axis="x", alpha=0.3)
     plt.tight_layout()
     return fig
+
+
+# =============================================================================
+# PANEL B — CLIENT PROFILE  (Panel 1 in spec)
+# =============================================================================
+
+def plot_client_profile(
+    raw_row: pd.Series | None, key_feats: list[str],
+    prediction: float, client_id: int, y_true: int | None,
+) -> plt.Figure:
+    """
+    Horizontal bar chart of the client's key feature values (normalised).
+    """
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    if raw_row is None:
+        ax.text(0.5, 0.5, "Raw features not available.\nRun preprocess.py first.",
+                ha="center", va="center", fontsize=12, transform=ax.transAxes)
+        ax.set_title(f"Client {client_id} — Profile")
+        return fig
+
+    present = [f for f in key_feats if f in raw_row.index and pd.notna(raw_row[f])]
+    if not present:
+        ax.text(0.5, 0.5, "None of the key features found in raw row.",
+                ha="center", va="center", transform=ax.transAxes)
+        return fig
+
+    vals  = np.array([float(raw_row[f]) for f in present])
+    color = _risk_color(prediction)
+
+    bars = ax.barh(present, vals, color=color, alpha=0.75, edgecolor="white", lw=0.5)
+    ax.set_xlabel("Feature Value (raw)")
+
+    title_parts = [f"Client {client_id} — Profile  |  Score: {prediction:.1%}"]
+    if y_true is not None:
+        title_parts.append(f"  True label: {'Default' if y_true else 'No Default'}")
+    ax.set_title("".join(title_parts))
+
+    # Annotate bars with value
+    for bar, val in zip(bars, vals):
+        ax.text(val, bar.get_y() + bar.get_height() / 2,
+                f"  {val:.3g}", va="center", fontsize=8)
+
+    ax.grid(axis="x", alpha=0.3)
+    plt.tight_layout()
+    return fig
+
 
