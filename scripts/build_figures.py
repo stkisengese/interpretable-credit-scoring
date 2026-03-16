@@ -2,9 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.patches import Wedge, Circle
 
 from utils import (
-    _risk_color, _wrap
+    _risk_color, _risk_label, _wrap, RISK_BANDS
 )
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -193,5 +194,59 @@ def plot_population_comparison(
         f"(Score: {prediction:.1%})",
         fontsize=10,
     )
+    plt.tight_layout()
+    return fig
+
+
+# =============================================================================
+# PANEL D — SCORE GAUGE  (Panel 3 in spec)
+# =============================================================================
+
+def plot_score_gauge(prediction: float, client_id: int) -> plt.Figure:
+    """
+    Semi-circular gauge showing default probability with coloured risk bands.
+    """
+    fig, ax = plt.subplots(figsize=(6, 3.8))
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-0.15, 1.2)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    # Draw coloured arc wedges
+    for lo, hi, color, label in RISK_BANDS:
+        theta1 = 180.0 - lo * 180.0
+        theta2 = 180.0 - hi * 180.0
+        w = Wedge((0, 0), 1.0, theta2, theta1,
+                  width=0.30, facecolor=color, alpha=0.85,
+                  edgecolor="white", lw=1.5)
+        ax.add_patch(w)
+        mid_theta = np.radians((theta1 + theta2) / 2)
+        lx = 0.73 * np.cos(mid_theta)
+        ly = 0.73 * np.sin(mid_theta)
+        ax.text(lx, ly, label, ha="center", va="center",
+                fontsize=8, fontweight="bold", color="white")
+
+    # Needle
+    needle_rad = np.radians(180.0 - prediction * 180.0)
+    ax.annotate(
+        "",
+        xy=(0.87 * np.cos(needle_rad), 0.87 * np.sin(needle_rad)),
+        xytext=(0, 0),
+        arrowprops=dict(arrowstyle="-|>", color="black", lw=2.5,
+                        mutation_scale=18),
+    )
+    ax.add_patch(Circle((0, 0), 0.07, color="white", zorder=5))
+    ax.add_patch(Circle((0, 0), 0.04, color="#2c3e50", zorder=6))
+
+    # Score text
+    ax.text(0, -0.22, f"{prediction:.1%}", ha="center", va="center",
+            fontsize=24, fontweight="bold", color=_risk_color(prediction))
+    ax.text(0, -0.42, "Default Probability", ha="center", va="center",
+            fontsize=10, color="#555555")
+    ax.text(0, -0.58, f"Risk Level: {_risk_label(prediction)}",
+            ha="center", va="center",
+            fontsize=11, fontweight="bold", color=_risk_color(prediction))
+
+    ax.set_title(f"Client {client_id} — Credit Risk Score", fontsize=11, pad=8)
     plt.tight_layout()
     return fig
