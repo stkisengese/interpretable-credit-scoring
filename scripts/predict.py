@@ -198,3 +198,39 @@ def get_client_data(client_id: int, art: dict):
             f"Train has {len(train_ids):,} clients, Test has {len(test_ids):,} clients."
         )
 
+
+# =============================================================================
+# STEP 3 — LOCAL EXPLANATION  (SHAP or fast approximation)
+# =============================================================================
+
+def compute_local_explanation(
+    model, X_client: np.ndarray, X_background: np.ndarray,
+    feature_names: np.ndarray, gain_importance: np.ndarray | None = None,
+) -> tuple[np.ndarray, float, float]:
+    """
+    Compute per-feature contributions for one client.
+
+    Returns
+    -------
+    contributions : (n_features,) array of signed contributions
+    base_value    : expected prediction (background mean)
+    prediction    : model's prediction for this client
+    """
+    prediction = float(model.predict_proba(X_client)[:, 1][0])
+
+    # Background subsample
+    n_bg  = min(N_BG_SAMPLES, len(X_background))
+    rng   = np.random.default_rng(RANDOM_STATE)
+    bg    = X_background[rng.choice(len(X_background), n_bg, replace=False)]
+    base_value = float(model.predict_proba(bg)[:, 1].mean())
+
+    # ── SHAP (TreeExplainer) ──────────────────────────────────────────────
+    explainer = shap.TreeExplainer(model, bg)
+    sv = explainer.shap_values(X_client)
+    if isinstance(sv, list):
+        sv = sv[1]
+    bv = explainer.expected_value
+    if isinstance(bv, (list, np.ndarray)):
+        bv = float(bv[1])
+    return sv[0].astype(np.float32), float(bv), prediction
+
