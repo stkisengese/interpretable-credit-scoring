@@ -281,3 +281,47 @@ def plot_shap_bar(shap_vals, feature_names, top_n=25):
 
     return idx, abs_imp
 
+
+# =============================================================================
+# STEP 7 — DEPENDENCE PLOTS  (top 5 features)
+# =============================================================================
+
+def plot_dependence_plots(shap_vals, X_sample, feature_names, top_n=5):
+    """
+    Scatter of feature value vs. SHAP value for the top-n most important features.
+    Reveals non-linear effects and interaction patterns.
+    """
+    _print_header("Dependence plots (top 5 features)")
+
+    n_feat  = min(len(feature_names), shap_vals.shape[1])
+    abs_imp = np.abs(shap_vals[:, :n_feat]).mean(axis=0)
+    top_idx = np.argsort(abs_imp)[-top_n:][::-1]
+
+    for rank, fi in enumerate(top_idx, 1):
+        fname  = feature_names[fi]
+        fvals  = X_sample[:, fi]
+        sv     = shap_vals[:, fi]
+        abs_lim = float(np.abs(sv).max())
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        sc = ax.scatter(
+            fvals, sv,
+            c=sv, cmap="RdBu_r",
+            alpha=0.35, s=10,
+            vmin=-abs_lim, vmax=abs_lim,
+        )
+        plt.colorbar(sc, ax=ax, label="SHAP value")
+        ax.axhline(0, color="black", lw=0.8, ls="--")
+        ax.set_xlabel(fname, fontsize=11)
+        ax.set_ylabel("SHAP value  (contribution to default probability)")
+        ax.set_title(
+            f"SHAP Dependence Plot — {fname}\n"
+            f"Rank #{rank} by mean |SHAP|  "
+            f"(positive SHAP = higher default risk)"
+        )
+        ax.grid(alpha=0.2)
+        plt.tight_layout()
+
+        safe_name = fname[:30].replace("/", "_").replace(" ", "_")
+        _save_fig(fig, f"shap_dependence_{rank}_{safe_name}.png")
+
