@@ -249,3 +249,128 @@ def retrain_final_model(X: np.ndarray, y: np.ndarray,
     print(f"  Final model trained — n_iter = {model.n_iter_}")
     return model
 
+
+# ===========================================================================
+# STEP 4 — LEARNING CURVES  (memory-safe sequential manual implementation)
+# ===========================================================================
+
+def plot_learning_curves(X: np.ndarray, y: np.ndarray):
+    """
+    Plot training AUC vs validation AUC as training set size grows.
+
+    Memory strategy
+    ---------------
+    sklearn.model_selection.learning_curve with n_jobs=-1 spawns
+    N_SIZES × N_FOLDS processes in parallel, each holding a full copy
+    of X_train in RAM (307 k × 417 × 8 B ≈ 1 GB each → up to 41 GB).
+
+    This implementation avoids that in three ways:
+
+    1. Stratified subsample  — the diagnostic needs at most LC_MAX_ROWS rows.
+       The curve shape is reliable at this scale; using the full 307 k rows
+       would give identical conclusions at 6× the memory cost.
+
+    2. Sequential fitting    — one model is alive at a time.  After scoring,
+       the model is deleted and gc.collect() is called before the next fit.
+
+    3. Fixed iteration count — no early stopping in the diagnostic, so no
+       internal validation split is held in memory alongside the model.
+    """
+    _print_header("Learning curves (training vs validation AUC)")
+
+    # ── 1. Stratified subsample ───────────────────────────────────────────────
+    n_total = len(y)
+    if n_total > LC_MAX_ROWS:
+        rng    = np.random.default_rng(RANDOM_STATE)
+        # Sample separately from each class to preserve the ~8 % imbalance
+        idx0   = np.where(y == 0)[0]
+        idx1   = np.where(y == 1)[0]
+        k1     = int(LC_MAX_ROWS * y.mean())
+        k0     = LC_MAX_ROWS - k1
+        chosen = np.concatenate([
+            rng.choice(idx0, min(k0, len(idx0)), replace=False),
+            rng.choice(idx1, min(k1, len(idx1)), replace=False),
+        ])
+        rng.shuffle(chosen)
+        X_lc, y_lc = X[chosen], y[chosen]
+        print(f"  Using stratified subsample: {len(y_lc):,} / {n_total:,} rows"
+              f"  (positive rate: {y_lc.mean():.2%})")
+    else:
+        X_lc, y_lc = X, y
+        print(f"  Using full dataset: {n_total:,} rows")
+
+    # ── 2. Build params for diagnostic (fast fixed-iter, no early stopping) ───
+    _drop = {"early_stopping", "n_iter_no_change", "validation_fraction", "scoring"}
+    lc_params = {k: v for k, v in HGBC_PARAMS.items() if k not in _drop}
+    lc_params.update({"max_iter": LC_MAX_ITER, "early_stopping": False})
+
+    # ── 3. Sequential manual learning curve ──────────────────────────────────
+    skf         = StratifiedKFold(3, shuffle=True, random_state=RANDOM_STATE)
+    train_fracs = np.linspace(0.15, 1.0, LC_N_SIZES)
+    n_lc        = len(X_lc)
+
+    tr_aucs_all  = []
+    val_aucs_all = []
+    train_sizes  = []
+
+    for frac in train_fracs:
+        fold_tr, fold_val = [], []
+        size_this = 0
+
+        for tr_idx, val_idx in skf.split(X_lc, y_lc):
+            # Apply the training-size fraction *within* the fold's train split
+            n_use = max(2, int(len(tr_idx) * frac))
+            tr_sub = tr_idx[:n_use]
+
+            model = HistGradientBoostingClassifier(**lc_params)
+            model.fit(X_lc[tr_sub], y_lc[tr_sub])
+
+            fold_tr.append(roc_auc_score(y_lc[tr_sub],
+                                         model.predict_proba(X_lc[tr_sub])[:, 1]))
+            fold_val.append(roc_auc_score(y_lc[val_idx],
+                                          model.predict_proba(X_lc[val_idx])[:, 1]))
+            size_this = n_use
+
+            # ── Free memory immediately ──────────────────────────────────────
+            del model; gc.collect()
+
+        tr_aucs_all.append(fold_tr)
+        val_aucs_all.append(fold_val)
+        train_sizes.append(size_this)
+        print(f"  size={size_this:6,}  train={np.mean(fold_tr):.4f}"
+              f"  val={np.mean(fold_val):.4f}")
+
+    # ── Free subsample ────────────────────────────────────────────────────────
+    if n_total > LC_MAX_ROWS:
+        del X_lc, y_lc; gc.collect()
+
+    # ── Plot ──────────────────────────────────────────────────────────────────
+    tr_arr  = np.array(tr_aucs_all)   # shape (n_sizes, n_folds)
+    val_arr = np.array(val_aucs_all)
+
+    tr_mean,  tr_std  = tr_arr.mean(1),  tr_arr.std(1)
+    val_mean, val_std = val_arr.mean(1), val_arr.std(1)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.fill_between(train_sizes, tr_mean  - tr_std,  tr_mean  + tr_std,  alpha=0.15, color="C0")
+    ax.fill_between(train_sizes, val_mean - val_std, val_mean + val_std, alpha=0.15, color="C1")
+    ax.plot(train_sizes, tr_mean,  "o-", color="C0", label="Training AUC")
+    ax.plot(train_sizes, val_mean, "s-", color="C1", label="Validation AUC")
+    ax.axhline(TARGET_AUC, ls="--", color="grey", lw=1,
+               label=f"Target AUC = {TARGET_AUC}")
+    ax.set_xlabel("Training set size (subsample rows)")
+    ax.set_ylabel("ROC-AUC")
+    ax.set_title(
+        "Learning Curves — HistGradientBoostingClassifier\n"
+        f"(diagnostic on {min(n_total, LC_MAX_ROWS):,}-row stratified subsample)"
+    )
+    ax.legend()
+    ax.grid(alpha=0.3)
+    save_figure(fig, "learning_curves.png")
+
+    gap = tr_mean[-1] - val_mean[-1]
+    print(f"\n  Largest training size — train AUC : {tr_mean[-1]:.4f} ± {tr_std[-1]:.4f}")
+    print(f"  Largest training size — val AUC   : {val_mean[-1]:.4f} ± {val_std[-1]:.4f}")
+    print(f"  Overfitting gap                   : {gap:.4f}"
+          f"  {'(acceptable)' if gap < 0.05 else '(WARNING: gap > 5 pp)'}")
+
