@@ -123,3 +123,29 @@ def get_feature_names(pipeline, n_features: int) -> np.ndarray:
         print(f"  WARNING: could not extract feature names ({exc})")
         return np.array([f"feat_{i}" for i in range(n_features)], dtype=object)
 
+
+# =============================================================================
+# STEP 3 — GAIN-BASED IMPORTANCE
+# =============================================================================
+
+def hgbc_gain_importance(model, n_features: int) -> np.ndarray:
+    """
+    Extract gain-based feature importance from HGBC internal tree nodes.
+
+    HistGradientBoostingClassifier does not expose feature_importances_
+    as a top-level attribute, but the split-gain for each internal node is
+    stored in model._predictors[i][0].nodes['gain'].  We sum gains across
+    all trees and all split nodes, then normalise to [0, 1].
+    """
+    gains = np.zeros(n_features, dtype=np.float64)
+    for iter_predictors in model._predictors:
+        for predictor in iter_predictors:
+            nodes = predictor.nodes
+            split_nodes = nodes[nodes["is_leaf"] == 0]
+            for node in split_nodes:
+                fi = int(node["feature_idx"])
+                if 0 <= fi < n_features:
+                    gains[fi] += max(0.0, float(node["gain"]))
+    total = gains.sum()
+    return gains / total if total > 0 else gains
+
