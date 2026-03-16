@@ -47,6 +47,7 @@ from custom_transformers import (
 from utils import (
     _print_header, _save_fig, _dense_float32, _stratified_sample
 )
+from feature_narative import write_feature_narrative
 
 warnings.filterwarnings("ignore")
 
@@ -325,3 +326,38 @@ def plot_dependence_plots(shap_vals, X_sample, feature_names, top_n=5):
         safe_name = fname[:30].replace("/", "_").replace(" ", "_")
         _save_fig(fig, f"shap_dependence_{rank}_{safe_name}.png")
 
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+def run_global_interpretability():
+    model, pipeline, X_train, y_train = load_artifacts()
+    feature_names = get_feature_names(pipeline, X_train.shape[1])
+
+    # Gain-based importance 
+    gain_imp = plot_builtin_importance(model, feature_names)
+    gc.collect()
+
+    # Global SHAP / permutation proxy 
+    shap_vals, X_sample, y_sample, base_val, method = compute_global_explanation(
+        model, X_train, y_train, feature_names, gain_imp
+    )
+    del X_train, y_train
+    gc.collect()
+
+    plot_beeswarm(shap_vals, X_sample, feature_names, method)
+    plot_shap_bar(shap_vals, feature_names)
+    plot_dependence_plots(shap_vals, X_sample, feature_names)
+    write_feature_narrative(shap_vals, feature_names)
+
+    del shap_vals, X_sample, y_sample
+    gc.collect()
+
+    _print_header("Global interpretability complete")
+    print(f"  All plots  → {INTERP_DIR}/")
+    print(f"  Narrative  → {INTERP_DIR}/feature_narrative.txt")
+
+
+if __name__ == "__main__":
+    run_global_interpretability()
