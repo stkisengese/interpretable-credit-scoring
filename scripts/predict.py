@@ -365,3 +365,31 @@ def run_client_analyses(art: dict):
     print(f"  • client2_wrong_train.pdf    (SK_ID_CURR={cid2})")
     print(f"  • client_test.pdf            (SK_ID_CURR={cid3})")
 
+
+# =============================================================================
+# SCORE A SINGLE CLIENT  (public API / CLI)
+# =============================================================================
+
+def predict_score(client_id: int):
+    """
+    Score a single client and print the result.
+    Does not save a PDF; use generate_client_pdf() for a full report.
+    """
+    art = load_artifacts()
+    X_client, raw_row, y_true, oof_pred, dataset, _ = get_client_data(
+        client_id, art
+    )
+    prediction = float(art["model"].predict_proba(X_client)[:, 1][0])
+
+    print(f"\n{'='*50}")
+    print(f"Client       : {client_id}")
+    print(f"Dataset      : {dataset}")
+    print(f"Default Prob : {prediction:.4f}  ({prediction:.1%})")
+    print(f"Risk Level   : {_risk_label(prediction)}")
+    if y_true is not None:
+        print(f"True Label   : {'Default' if y_true else 'No Default'}")
+    if oof_pred is not None:
+        print(f"OOF Pred     : {oof_pred:.4f}")
+    print(f"{'='*50}")
+
+    return prediction
