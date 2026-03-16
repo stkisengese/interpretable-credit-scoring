@@ -7,6 +7,7 @@ import textwrap
 import numpy as np
 import scipy.sparse as sp
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 RANDOM_STATE    = 42
 MODEL_DIR       = os.path.join("results", "model")
@@ -102,3 +103,17 @@ def _risk_color(p: float) -> str:
 
 def _wrap(text: str, width: int = 70) -> str:
     return "\n".join(textwrap.wrap(text, width))
+
+
+def _get_gain_importance(model, n_features):
+    """Extract normalised gain importance from HGBC internal trees."""
+    gains = np.zeros(n_features)
+    for iter_preds in model._predictors:
+        for predictor in iter_preds:
+            nodes = predictor.nodes
+            for node in nodes[nodes["is_leaf"] == 0]:
+                fi = int(node["feature_idx"])
+                if 0 <= fi < n_features:
+                    gains[fi] += max(0.0, float(node["gain"]))
+    total = gains.sum()
+    return gains / total if total > 0 else gains
