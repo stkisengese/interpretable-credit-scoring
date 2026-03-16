@@ -195,3 +195,19 @@ def _compute_shap(model, X_sample, y_sample, feature_names):
         base_val = float(base_val[1])
     return shap_vals.astype(np.float32), float(base_val)
 
+
+def compute_global_explanation(model, X_train, y_train, feature_names, gain_imp):
+    """Return shap_values, X_sample, y_sample, base_value, method_name."""
+    _print_header("Computing global explanations")
+
+    n = N_SHAP_SAMPLES if SHAP_AVAILABLE else N_PERM_SAMPLES
+    X_s, y_s = _stratified_sample(X_train, y_train, n)
+    print(f"  Sample: {len(X_s)} rows  |  positives: {y_s.mean():.2%}")
+
+    if SHAP_AVAILABLE:
+        sv, bv = _compute_shap(model, X_s, y_s, feature_names)
+        return sv, X_s, y_s, bv, "shap"
+    else:
+        print("Install shap and import for processing.\n")
+        exit
+
