@@ -469,3 +469,81 @@ def make_submission(final_model: HistGradientBoostingClassifier,
     print(f"  Shape            : {sub.shape}")
     print(f"  Predicted default rate (test): {probs.mean():.2%}")
 
+
+# ===========================================================================
+# MAIN  —  explicit memory-lifecycle management
+# ===========================================================================
+
+def train_model():
+    t_start = time.time()
+
+    # ── Load data ─────────────────────────────────────────────────────────────
+    X_train, X_test, y_train, test_ids = load_data()
+
+    # ── Baseline ──────────────────────────────────────────────────────────────
+    baseline_aucs = train_baseline(X_train, y_train)
+    gc.collect()
+
+    # ── Primary model CV ─────────────────────────────────────────────────────
+    oof_preds, fold_aucs, fold_models, iters_per_fold = train_primary_model(
+        X_train, y_train)
+    gc.collect()
+
+    # ── Save fold models then FREE them before the memory-heavy steps ─────────
+    _print_header("Saving fold models (then freeing RAM)")
+    fold_models_path = os.path.join(MODEL_DIR, "fold_models.pkl")
+    joblib.dump(fold_models, fold_models_path)
+    print(f"  Fold models → {fold_models_path}")
+    del fold_models
+    gc.collect()
+    print("  fold_models deleted from RAM")
+
+    # ── Learning curves  (uses its own subsample; sequential) ─────────────────
+    plot_learning_curves(X_train, y_train)
+    gc.collect()
+
+    # ── Evaluation ────────────────────────────────────────────────────────────
+    metrics = evaluate_oof(y_train, oof_preds, fold_aucs, baseline_aucs)
+
+    # ── Retrain final model ───────────────────────────────────────────────────
+    final_model = retrain_final_model(X_train, y_train, iters_per_fold)
+
+    # ── Save model artefacts ──────────────────────────────────────────────────
+    _print_header("Saving model artefacts")
+
+    model_path = os.path.join(MODEL_DIR, "my_own_model.pkl")
+    joblib.dump(final_model, model_path)
+    print(f"  Final model  → {model_path}")
+
+    oof_path = os.path.join(MODEL_DIR, "oof_predictions.pkl")
+    joblib.dump({"oof_preds": oof_preds, "y_true": y_train}, oof_path)
+    print(f"  OOF preds    → {oof_path}")
+
+    metrics_path = os.path.join(MODEL_DIR, "cv_metrics.pkl")
+    joblib.dump(metrics, metrics_path)
+    print(f"  CV metrics   → {metrics_path}")
+
+    # ── Kaggle submission  (needs X_test) ────────────────────────────────────
+    make_submission(final_model, X_test, test_ids)
+    # Free X_test — no longer needed after this point
+    del X_test, test_ids
+    gc.collect()
+
+    # ── Model report ──────────────────────────────────────────────────────────
+    # write_model_report(metrics, iters_per_fold, baseline_aucs)
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    elapsed = time.time() - t_start
+    _print_header("Training complete")
+    print(f"  Baseline LR CV AUC    : {_auc_str(baseline_aucs)}")
+    print(f"  Primary model OOF AUC : {metrics['oof_auc']:.4f}")
+    print(f"  Total wall time       : {elapsed/60:.1f} min")
+    print(f"\nArtefacts in {MODEL_DIR}/")
+    for fname in ("my_own_model.pkl", "submission.csv", "model_report.txt",
+                  "roc_curve.png", "pr_curve.png",
+                  "confusion_matrix.png", "learning_curves.png"):
+        print(f"  {fname}")
+
+
+if __name__ == "__main__":
+    train_model()
