@@ -59,3 +59,46 @@ def _stratified_sample(X, y, n):
     rng.shuffle(idx)
     return X[idx], y[idx]
 
+
+# =============================================================================
+# EXPLAINABILITY
+# =============================================================================
+
+def _dense_f32(X) -> np.ndarray:
+    """Return a float32 dense array — half the memory of float64."""
+    arr = X.toarray() if sp.issparse(X) else np.asarray(X)
+    return arr.astype(np.float32, copy=False)
+
+
+def _auc_str(scores) -> str:
+    a = np.asarray(scores)
+    return f"{a.mean():.4f} ± {a.std():.4f}"
+
+
+def save_figure(fig: plt.Figure, filename: str):
+    path = os.path.join(MODEL_DIR, filename)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved → {path}")
+
+
+# =============================================================================
+# PREDICT
+# =============================================================================
+
+def _risk_label(p: float) -> str:
+    for lo, hi, _, label in RISK_BANDS:
+        if lo <= p < hi:
+            return label
+    return "Very High"
+
+
+def _risk_color(p: float) -> str:
+    for lo, hi, color, _ in RISK_BANDS:
+        if lo <= p < hi:
+            return color
+    return "#c0392b"
+
+
+def _wrap(text: str, width: int = 70) -> str:
+    return "\n".join(textwrap.wrap(text, width))
