@@ -44,3 +44,87 @@ _PROTECTED_KEYWORDS = [
 # Features that are legitimate business features despite containing 'age'
 _AGE_WHITELIST = {"age_years", "years_employed"}
 
+
+def write_feature_narrative(shap_vals, feature_names, top_n=10):
+    """Plain-language top-10 narrative + regulatory check."""
+    _print_header("Feature narrative + regulatory check")
+
+    n_feat  = min(len(feature_names), shap_vals.shape[1])
+    abs_imp = np.abs(shap_vals[:, :n_feat]).mean(axis=0)
+    mean_sv = shap_vals[:, :n_feat].mean(axis=0)
+    top_idx = np.argsort(abs_imp)[-top_n:][::-1]
+
+    flagged = []
+    lines   = [
+        "HOME CREDIT DEFAULT RISK — GLOBAL FEATURE IMPORTANCE NARRATIVE",
+        "=" * 65,
+        "",
+        "Analysis method: SHAP TreeExplainer",
+        f"Top {top_n} features ranked by mean absolute impact on predicted",
+        "default probability (higher = more influential).",
+        "",
+    ]
+
+    for rank, fi in enumerate(top_idx, 1):
+        if fi >= len(feature_names):
+            continue
+        fname     = feature_names[fi]
+        impact    = float(abs_imp[fi])
+        direction = "↑ increases" if mean_sv[fi] > 0 else "↓ decreases"
+        desc      = _CREDIT_DESCRIPTIONS.get(fname, "(no description — engineered/OHE feature)")
+
+        # Regulatory check
+        fname_l = fname.lower()
+        is_flag = (
+            any(kw in fname_l for kw in _PROTECTED_KEYWORDS)
+            and fname_l not in _AGE_WHITELIST
+        )
+        if is_flag:
+            flagged.append(fname)
+
+        lines += [
+            f"{rank:2d}. {fname}",
+            f"    Avg impact : {impact:.5f}",
+            f"    Direction  : {direction} default risk",
+            f"    Meaning    : {desc}",
+        ]
+        if is_flag:
+            lines.append(
+                f"    ⚠️  REGULATORY FLAG: feature name suggests possible "
+                f"protected attribute."
+            )
+        lines.append("")
+
+    # Regulatory summary
+    lines += [
+        "=" * 65,
+        "REGULATORY / FAIRNESS SUMMARY",
+        "=" * 65,
+    ]
+    if flagged:
+        lines += [
+            f"⚠️  {len(flagged)} potentially protected feature(s) in top {top_n}:",
+        ] + [f"   • {f}" for f in flagged] + [
+            "",
+            "   Action required: conduct a full disparate-impact analysis",
+            "   under applicable fair-lending regulations before deployment.",
+        ]
+    else:
+        lines += [
+            f"✓ No obviously discriminatory features detected in top {top_n}.",
+            "",
+            "  Important caveat: proxy discrimination is still possible.",
+            "  Features such as CREDIT_INCOME_RATIO or EMPLOYMENT_RATIO may",
+            "  correlate with protected classes even though they appear",
+            "  facially neutral.  A full fairness / disparate-impact audit",
+            "  (e.g., using AIF360 or Fairlearn) should be conducted before",
+            "  production deployment.",
+        ]
+
+    narrative = "\n".join(lines)
+    path      = os.path.join(INTERP_DIR, "feature_narrative.txt")
+    with open(path, "w") as fh:
+        fh.write(narrative)
+    print(f"  Feature narrative saved → {path}")
+    print()
+    print(narrative)
