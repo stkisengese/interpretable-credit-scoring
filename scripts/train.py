@@ -34,6 +34,7 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 from sklearn.preprocessing import MaxAbsScaler
+from utils import _print_header, _auc_str, _dense_f32, save_figure
 
 warnings.filterwarnings("ignore")
 
@@ -75,31 +76,6 @@ HGBC_PARAMS = dict(
     random_state        = RANDOM_STATE,
     verbose             = 0,
 )
-
-# ---------------------------------------------------------------------------
-# Tiny helpers
-# ---------------------------------------------------------------------------
-
-def _dense_f32(X) -> np.ndarray:
-    """Return a float32 dense array — half the memory of float64."""
-    arr = X.toarray() if sp.issparse(X) else np.asarray(X)
-    return arr.astype(np.float32, copy=False)
-
-
-def _print_header(title: str):
-    print(f"\n{'=' * 65}\n{title}\n{'=' * 65}")
-
-
-def _auc_str(scores) -> str:
-    a = np.asarray(scores)
-    return f"{a.mean():.4f} ± {a.std():.4f}"
-
-
-def save_figure(fig: plt.Figure, filename: str):
-    path = os.path.join(MODEL_DIR, filename)
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Saved → {path}")
 
 
 # ===========================================================================
