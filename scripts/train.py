@@ -175,3 +175,51 @@ def train_baseline(X: np.ndarray, y: np.ndarray) -> list[float]:
     print(f"\n  Baseline CV AUC: {_auc_str(aucs)}")
     return aucs
 
+
+# ===========================================================================
+# STEP 2 — PRIMARY MODEL
+# ===========================================================================
+
+def train_primary_model(X: np.ndarray, y: np.ndarray):
+    """
+    5-fold stratified CV with HistGradientBoostingClassifier.
+
+    Overfitting prevention
+    ----------------------
+    • L2 regularisation (l2_regularization=0.1)
+    • Column sub-sampling (max_features=0.8)
+    • Minimum leaf size (min_samples_leaf=20)
+    • Early stopping: patience=50 rounds on a held-out 10 % validation split
+    """
+    _print_header("Primary model — HistGradientBoostingClassifier (5-fold CV)")
+
+    skf       = StratifiedKFold(N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    oof_preds = np.zeros(len(y), dtype=np.float32)
+    fold_aucs = []
+    models    = []
+    iters_per_fold = []
+
+    for fold, (tr, val) in enumerate(skf.split(X, y), 1):
+        t0 = time.time()
+        model = HistGradientBoostingClassifier(**HGBC_PARAMS)
+        model.fit(X[tr], y[tr])
+
+        prob = model.predict_proba(X[val])[:, 1].astype(np.float32)
+        auc  = roc_auc_score(y[val], prob)
+
+        oof_preds[val] = prob
+        fold_aucs.append(auc)
+        iters_per_fold.append(model.n_iter_)
+        models.append(model)
+
+        print(f"  Fold {fold}: AUC = {auc:.4f} | "
+              f"n_iter = {model.n_iter_:4d} | {time.time()-t0:.1f}s")
+
+    oof_auc = roc_auc_score(y, oof_preds)
+    print(f"\n  CV AUC (per-fold): {_auc_str(fold_aucs)}")
+    print(f"  OOF AUC (global) : {oof_auc:.4f}")
+    status = "✓" if oof_auc >= TARGET_AUC else "✗"
+    print(f"  {status} OOF AUC {oof_auc:.4f} {'meets' if oof_auc >= TARGET_AUC else 'below'} target ≥ {TARGET_AUC}")
+
+    return oof_preds, fold_aucs, models, iters_per_fold
+
