@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 from utils import (
-    _risk_color,
+    _risk_color, _wrap
 )
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -133,3 +133,65 @@ def plot_client_profile(
     return fig
 
 
+# =============================================================================
+# PANEL C — CLIENT VS POPULATION  (Panel 2 in spec)
+# =============================================================================
+
+def plot_population_comparison(
+    raw_row: pd.Series | None, raw_train: pd.DataFrame | None,
+    key_feats: list[str], client_id: int, prediction: float,
+) -> plt.Figure:
+    """
+    Violin plots showing where the client sits in the training population
+    distribution for each key feature.  Client's value overlaid as a marker.
+    """
+    if raw_row is None or raw_train is None:
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.text(0.5, 0.5,
+                "Raw features unavailable.\nRun preprocess.py first.",
+                ha="center", va="center", transform=ax.transAxes)
+        ax.set_title(f"Client {client_id} — vs. Population")
+        return fig
+
+    present = [f for f in key_feats
+               if f in raw_row.index and f in raw_train.columns
+               and pd.notna(raw_row[f])]
+    if not present:
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.text(0.5, 0.5, "No matching key features found.",
+                ha="center", va="center", transform=ax.transAxes)
+        return fig
+
+    n_feat = len(present)
+    fig, axes = plt.subplots(1, n_feat, figsize=(max(9, 2.5 * n_feat), 5))
+    if n_feat == 1:
+        axes = [axes]
+
+    # Use a small subsample of the population to keep plot light
+    pop_sample = raw_train.sample(min(5_000, len(raw_train)), random_state=RANDOM_STATE)
+
+    for ax, feat in zip(axes, present):
+        pop_vals = pop_sample[feat].dropna().values
+
+        # Clip extreme outliers for readable plots
+        lo, hi = np.nanpercentile(pop_vals, [1, 99])
+        pop_clip = np.clip(pop_vals, lo, hi)
+
+        ax.violinplot(pop_clip, positions=[0], showmedians=True, widths=0.7)
+
+        client_val = float(raw_row[feat])
+        ax.scatter([0], [np.clip(client_val, lo, hi)],
+                   color=_risk_color(prediction), s=80, zorder=5,
+                   label=f"Client: {client_val:.3g}")
+        ax.set_xticks([])
+        ax.set_title(_wrap(feat, 18), fontsize=8, fontweight="bold")
+        ax.legend(fontsize=7, loc="lower right")
+        ax.grid(axis="y", alpha=0.3)
+
+    fig.suptitle(
+        f"Client {client_id} vs. Population Distribution  "
+        f"(Score: {prediction:.1%})",
+        fontsize=10,
+    )
+    plt.tight_layout()
+    return fig
