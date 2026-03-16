@@ -211,3 +211,33 @@ def compute_global_explanation(model, X_train, y_train, feature_names, gain_imp)
         print("Install shap and import for processing.\n")
         exit
 
+
+# =============================================================================
+# STEP 5 — BEESWARM PLOT
+# =============================================================================
+
+def plot_beeswarm(shap_vals, X_sample, feature_names, method, top_n=20):
+    """
+    SHAP beeswarm plot:
+      y-axis  — feature ranked by mean |SHAP|
+      x-axis  — SHAP value (contribution to default probability)
+      colour  — feature value (blue=low, red=high)
+    """
+    _print_header("Beeswarm plot")
+
+    if SHAP_AVAILABLE and method == "shap":
+        shap.summary_plot(
+            shap_vals, X_sample,
+            feature_names=feature_names,
+            max_display=top_n,
+            show=False,
+            plot_type="dot",
+        )
+        fig = plt.gcf()
+        fig.set_size_inches(10, max(6, top_n * 0.38))
+        plt.tight_layout()
+        _save_fig(fig, "shap_beeswarm.png")
+        print("  SHAP beeswarm saved.")
+    else:
+        print("Import and install shap.\n")
+
