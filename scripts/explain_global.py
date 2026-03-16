@@ -241,3 +241,43 @@ def plot_beeswarm(shap_vals, X_sample, feature_names, method, top_n=20):
     else:
         print("Import and install shap.\n")
 
+
+# =============================================================================
+# STEP 6 — BAR PLOT (mean |SHAP|)
+# =============================================================================
+
+def plot_shap_bar(shap_vals, feature_names, top_n=25):
+    """Mean absolute SHAP value bar chart ranked by global importance."""
+    _print_header("Mean |SHAP| bar plot")
+
+    n_feat  = min(len(feature_names), shap_vals.shape[1])
+    abs_imp = np.abs(shap_vals[:, :n_feat]).mean(axis=0)
+    mean_sv = shap_vals[:, :n_feat].mean(axis=0)          # for directionality
+
+    k   = min(top_n, n_feat)
+    idx = np.argsort(abs_imp)[-k:]
+    vals  = abs_imp[idx]
+    signs = np.sign(mean_sv[idx])
+    names = feature_names[idx]
+
+    colors = ["#e74c3c" if s > 0 else "#3498db" for s in signs]
+
+    fig, ax = plt.subplots(figsize=(10, max(6, k * 0.33)))
+    ax.barh(range(k), vals, color=colors, edgecolor="white", lw=0.4)
+    ax.set_yticks(range(k))
+    ax.set_yticklabels(names, fontsize=8)
+    ax.set_xlabel("Mean |SHAP value| (average impact on model output)")
+    ax.set_title(f"Top {k} Features — Global SHAP Importance\n"
+                 "Red = on average increases default risk, Blue = decreases")
+
+    legend = [
+        mpatches.Patch(color="#e74c3c", label="Avg direction: increases risk"),
+        mpatches.Patch(color="#3498db", label="Avg direction: decreases risk"),
+    ]
+    ax.legend(handles=legend, fontsize=8)
+    ax.grid(axis="x", alpha=0.3)
+    plt.tight_layout()
+    _save_fig(fig, "shap_bar.png")
+
+    return idx, abs_imp
+
