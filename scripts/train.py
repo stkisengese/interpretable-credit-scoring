@@ -453,3 +453,19 @@ def evaluate_oof(y_true: np.ndarray, oof_preds: np.ndarray,
     return dict(oof_auc=oof_auc, avg_prec=avg_prec, threshold=best_thr,
                 cm=cm, fold_aucs=fold_aucs, base_aucs=baseline_aucs)
 
+
+# ===========================================================================
+# STEP 6 — KAGGLE SUBMISSION
+# ===========================================================================
+
+def make_submission(final_model: HistGradientBoostingClassifier,
+                    X_test: np.ndarray, test_ids: pd.Series):
+    _print_header("Kaggle submission")
+    probs = final_model.predict_proba(X_test)[:, 1]
+    sub   = pd.DataFrame({"SK_ID_CURR": test_ids.values, "TARGET": probs})
+    path  = os.path.join(MODEL_DIR, "submission.csv")
+    sub.to_csv(path, index=False)
+    print(f"  Submission saved → {path}")
+    print(f"  Shape            : {sub.shape}")
+    print(f"  Predicted default rate (test): {probs.mean():.2%}")
+
