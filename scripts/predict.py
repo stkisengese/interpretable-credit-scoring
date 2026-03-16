@@ -44,7 +44,9 @@ from custom_transformers import (
 )
 from utils import (
     _dense_float32, _risk_label, 
-    _get_gain_importance, _make_title_page
+    _get_gain_importance, _make_title_page,
+    select_correct_client, select_wrong_client,
+    select_test_client, _wrong_client_note,
 )
 
 from build_figures import (
@@ -307,4 +309,59 @@ def generate_client_pdf(
 
     print(f"  PDF saved → {save_path}")
     gc.collect()
+
+
+# =============================================================================
+# RUN ALL 3 REQUIRED CLIENT ANALYSES
+# =============================================================================
+
+def run_client_analyses(art: dict):
+    """Generate the three required client PDF reports."""
+    print("\n" + "=" * 65)
+    print("GENERATING 3 REQUIRED CLIENT REPORTS")
+    print("=" * 65)
+
+    # ── Client 1: Correct prediction on train ──────────────────────────────
+    print("\n[1/3] Correct prediction (train set)")
+    cid1 = select_correct_client(art)
+    generate_client_pdf(
+        cid1, art,
+        save_path=os.path.join(CLIENTS_DIR, "client1_correct_train.pdf"),
+        analysis_note=(
+            "This client was correctly classified by the model. "
+            "The SHAP waterfall shows the dominant features driving the score. "
+            "Note how EXT_SOURCE scores and income ratios align with the "
+            "true outcome."
+        ),
+    )
+
+    # ── Client 2: Wrong prediction on train ──────────────────────────────
+    print("\n[2/3] Wrong prediction (train set)")
+    cid2 = select_wrong_client(art)
+    note2 = _wrong_client_note(art, cid2)
+    generate_client_pdf(
+        cid2, art,
+        save_path=os.path.join(CLIENTS_DIR, "client2_wrong_train.pdf"),
+        analysis_note=note2,
+    )
+
+    # ── Client 3: Test set client ─────────────────────────────────────────
+    print("\n[3/3] Test set client")
+    cid3 = select_test_client(art)
+    generate_client_pdf(
+        cid3, art,
+        save_path=os.path.join(CLIENTS_DIR, "client_test.pdf"),
+        analysis_note=(
+            "Test-set client: true label is unknown (not publicly available). "
+            "The report shows the model's predicted risk and the key factors "
+            "driving the score, as would be presented to a customer service "
+            "representative or compliance officer."
+        ),
+    )
+
+    print("\n" + "=" * 65)
+    print("All client reports saved to results/clients_outputs/")
+    print(f"  • client1_correct_train.pdf  (SK_ID_CURR={cid1})")
+    print(f"  • client2_wrong_train.pdf    (SK_ID_CURR={cid2})")
+    print(f"  • client_test.pdf            (SK_ID_CURR={cid3})")
 
