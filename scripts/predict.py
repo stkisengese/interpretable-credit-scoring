@@ -234,3 +234,77 @@ def compute_local_explanation(
         bv = float(bv[1])
     return sv[0].astype(np.float32), float(bv), prediction
 
+
+# =============================================================================
+# PDF REPORT GENERATOR
+# =============================================================================
+
+def generate_client_pdf(
+    client_id: int, art: dict, save_path: str, analysis_note: str = ""
+):
+    """
+    Full pipeline: score client → explain → 4 panels → PDF.
+
+    Parameters
+    ----------
+    client_id     : SK_ID_CURR of the client
+    art           : artefacts dict from load_artifacts()
+    save_path     : path for the output PDF
+    analysis_note : free-text note appended to the report (e.g., error analysis)
+    """
+    print(f"\n--- Generating report for client {client_id} ---")
+
+    # ── Score ─────────────────────────────────────────────────────────────────
+    X_client, raw_row, y_true, oof_pred, dataset, row_idx = get_client_data(
+        client_id, art
+    )
+    prediction = float(art["model"].predict_proba(X_client)[:, 1][0])
+    print(f"  Dataset  : {dataset}")
+    print(f"  Prediction: {prediction:.4f}  ({_risk_label(prediction)} risk)")
+    if y_true is not None:
+        label_str = "Default" if y_true else "No Default"
+        correct   = (prediction >= 0.5) == bool(y_true)
+        print(f"  True label: {label_str}  |  Correct: {'✓' if correct else '✗'}")
+
+    # ── Local explanation ─────────────────────────────────────────────────────
+    gain_imp = _get_gain_importance(art["model"], X_client.shape[1])
+    contribs, base_val, _ = compute_local_explanation(
+        art["model"], X_client, art["X_train"],
+        art["feature_names"], gain_imp,
+    )
+
+    # ── Resolve key features ──────────────────────────────────────────────────
+    raw_feats = KEY_FEATURES
+    if raw_row is not None:
+        raw_feats = [f for f in KEY_FEATURES if f in raw_row.index]
+
+    # ── Build figures ─────────────────────────────────────────────────────────
+    fig_title   = _make_title_page(client_id, prediction, y_true, oof_pred,
+                                   dataset, analysis_note)
+    fig_wtfall  = plot_waterfall(contribs, art["feature_names"], base_val, prediction)
+    fig_profile = plot_client_profile(raw_row, raw_feats, prediction,
+                                      client_id, y_true)
+    fig_popcomp = plot_population_comparison(raw_row, art["raw_train"],
+                                             raw_feats, client_id, prediction)
+    fig_gauge   = plot_score_gauge(prediction, client_id)
+    fig_factors = plot_top_factors(contribs, art["feature_names"],
+                                   client_id, prediction)
+
+    # ── Write PDF ─────────────────────────────────────────────────────────────
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with PdfPages(save_path) as pdf:
+        for fig in (fig_title, fig_gauge, fig_wtfall,
+                    fig_profile, fig_popcomp, fig_factors):
+            pdf.savefig(fig, bbox_inches="tight")
+            plt.close(fig)
+
+        # PDF metadata
+        d = pdf.infodict()
+        d["Title"]   = f"Credit Score Report — Client {client_id}"
+        d["Author"]  = "skisenge01edukisumu"
+        d["Subject"] = "Interpretable Credit Scoring"
+        d["CreationDate"] = datetime.now()
+
+    print(f"  PDF saved → {save_path}")
+    gc.collect()
+
