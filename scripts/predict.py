@@ -393,3 +393,36 @@ def predict_score(client_id: int):
     print(f"{'='*50}")
 
     return prediction
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Score a client or generate all 3 required client PDFs."
+    )
+    grp = parser.add_mutually_exclusive_group(required=True)
+    grp.add_argument("--client_id", type=int,
+                     help="SK_ID_CURR of the client to score")
+    grp.add_argument("--run_all", action="store_true",
+                     help="Generate all 3 required client analysis PDFs")
+    parser.add_argument("--save_pdf", action="store_true",
+                        help="Also save a PDF report for --client_id")
+    args = parser.parse_args()
+
+    if args.run_all:
+        art = load_artifacts()
+        run_client_analyses(art)
+    else:
+        if args.save_pdf:
+            art = load_artifacts()
+            save_path = os.path.join(CLIENTS_DIR, f"client_{args.client_id}.pdf")
+            generate_client_pdf(args.client_id, art, save_path)
+        else:
+            predict_score(args.client_id)
+
+
+if __name__ == "__main__":
+    main()
