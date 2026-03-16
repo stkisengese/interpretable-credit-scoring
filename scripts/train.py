@@ -374,3 +374,82 @@ def plot_learning_curves(X: np.ndarray, y: np.ndarray):
     print(f"  Overfitting gap                   : {gap:.4f}"
           f"  {'(acceptable)' if gap < 0.05 else '(WARNING: gap > 5 pp)'}")
 
+
+# ===========================================================================
+# STEP 5 — EVALUATION PLOTS
+# ===========================================================================
+
+def evaluate_oof(y_true: np.ndarray, oof_preds: np.ndarray,
+                 fold_aucs: list[float], baseline_aucs: list[float]) -> dict:
+    _print_header("Evaluation on OOF predictions")
+
+    oof_auc  = roc_auc_score(y_true, oof_preds)
+    avg_prec = average_precision_score(y_true, oof_preds)
+
+    # ── ROC curve ─────────────────────────────────────────────────────────────
+    fpr, tpr, thresh_roc = roc_curve(y_true, oof_preds)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.plot(fpr, tpr, lw=2, label=f"OOF AUC = {oof_auc:.4f}")
+    ax.plot([0, 1], [0, 1], "k--", lw=1)
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve (Out-of-Fold)")
+    ax.legend(loc="lower right"); ax.grid(alpha=0.3)
+    save_figure(fig, "roc_curve.png")
+
+    # ── Precision-Recall curve ────────────────────────────────────────────────
+    prec, rec, _ = precision_recall_curve(y_true, oof_preds)
+    base_rate = float(y_true.mean())
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.plot(rec, prec, lw=2, label=f"AP = {avg_prec:.4f}")
+    ax.axhline(base_rate, ls="--", color="grey", lw=1,
+               label=f"Baseline prevalence = {base_rate:.2%}")
+    ax.set_xlabel("Recall"); ax.set_ylabel("Precision")
+    ax.set_title("Precision-Recall Curve (Out-of-Fold)")
+    ax.legend(); ax.grid(alpha=0.3)
+    save_figure(fig, "pr_curve.png")
+
+    # ── Confusion matrix at Youden-optimal threshold ──────────────────────────
+    J        = tpr - fpr
+    best_idx = int(np.argmax(J))
+    best_thr = float(thresh_roc[best_idx])
+    y_pred   = (oof_preds >= best_thr).astype(int)
+    cm       = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
+    plt.colorbar(im, ax=ax)
+    ax.set_xticks([0, 1]); ax.set_xticklabels(["Pred: No Default", "Pred: Default"])
+    ax.set_yticks([0, 1]); ax.set_yticklabels(["True: No Default", "True: Default"])
+    for i in range(2):
+        for j in range(2):
+            ax.text(j, i, f"{cm[i, j]:,}", ha="center", va="center",
+                    color="white" if cm[i, j] > cm.max() / 2 else "black",
+                    fontsize=13)
+    ax.set_title(f"Confusion Matrix\n"
+                 f"Threshold = {best_thr:.3f}  (Youden-optimal)\n"
+                 f"TPR = {tp/(tp+fn):.2%}  |  FPR = {fp/(fp+tn):.2%}")
+    plt.tight_layout()
+    save_figure(fig, "confusion_matrix.png")
+
+    print(f"  OOF AUC            : {oof_auc:.4f}")
+    print(f"  Average Precision  : {avg_prec:.4f}")
+    print(f"  Youden threshold   : {best_thr:.4f}")
+    print(f"  TP={tp:,}  FP={fp:,}  FN={fn:,}  TN={tn:,}")
+    print(f"  Sensitivity (TPR)  : {tp/(tp+fn):.2%}")
+    print(f"  Specificity (TNR)  : {tn/(tn+fp):.2%}")
+    print(f"  Precision          : {tp/(tp+fp):.2%}")
+
+    _print_header("Threshold choice justification")
+    print(
+        "  Youden's J (TPR − FPR) is maximised at the selected threshold.\n"
+        "  It balances sensitivity and specificity without requiring a\n"
+        "  business-specific cost matrix.  In production the bank would\n"
+        "  tune the threshold against the relative cost of missed defaults\n"
+        "  (credit loss) vs. false denials (lost revenue).\n"
+    )
+
+    return dict(oof_auc=oof_auc, avg_prec=avg_prec, threshold=best_thr,
+                cm=cm, fold_aucs=fold_aucs, base_aucs=baseline_aucs)
+
