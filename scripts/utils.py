@@ -184,3 +184,74 @@ def _make_title_page(
 
     return fig
 
+
+# =============================================================================
+# CLIENT SELECTION  (for the 3 required analyses at predict.py)
+# =============================================================================
+
+def select_correct_client(art: dict) -> int:
+    """
+    Find a training client the model predicts correctly with high confidence.
+    Prefer a confirmed defaulter scored > 0.6 (correct positive), or a
+    confirmed non-defaulter scored < 0.2 (correct negative).
+    """
+    if art["oof_preds"] is None:
+        raise RuntimeError("OOF predictions not found. Run train.py first.")
+
+    ids    = np.asarray(art["train_ids"])
+    y      = art["y_train"]
+    preds  = art["oof_preds"]
+
+    # Confident correct defaults (TP)
+    tp_mask = (y == 1) & (preds >= 0.55)
+    if tp_mask.any():
+        idx = int(np.where(tp_mask)[0][np.argmax(preds[tp_mask])])
+        print(f"  Correct client (TP): {ids[idx]}  score={preds[idx]:.4f}  y={y[idx]}")
+        return int(ids[idx])
+
+    # Confident correct non-defaults (TN)
+    tn_mask = (y == 0) & (preds <= 0.15)
+    if tn_mask.any():
+        idx = int(np.where(tn_mask)[0][np.argmin(preds[tn_mask])])
+        print(f"  Correct client (TN): {ids[idx]}  score={preds[idx]:.4f}  y={y[idx]}")
+        return int(ids[idx])
+
+    raise RuntimeError("Could not find a high-confidence correct prediction.")
+
+
+def select_wrong_client(art: dict) -> int:
+    """
+    Find a training client the model misclassifies.
+    Prefer a defaulter scored < 0.3 (FN — dangerous miss) or a
+    non-defaulter scored > 0.7 (FP — costly false alarm).
+    """
+    if art["oof_preds"] is None:
+        raise RuntimeError("OOF predictions not found. Run train.py first.")
+
+    ids   = np.asarray(art["train_ids"])
+    y     = art["y_train"]
+    preds = art["oof_preds"]
+
+    # False negatives: defaulter the model missed
+    fn_mask = (y == 1) & (preds <= 0.30)
+    if fn_mask.any():
+        idx = int(np.where(fn_mask)[0][np.argmin(preds[fn_mask])])
+        print(f"  Wrong client (FN): {ids[idx]}  score={preds[idx]:.4f}  y={y[idx]}")
+        return int(ids[idx])
+
+    # False positives: non-defaulter the model flagged
+    fp_mask = (y == 0) & (preds >= 0.70)
+    if fp_mask.any():
+        idx = int(np.where(fp_mask)[0][np.argmax(preds[fp_mask])])
+        print(f"  Wrong client (FP): {ids[idx]}  score={preds[idx]:.4f}  y={y[idx]}")
+        return int(ids[idx])
+
+    raise RuntimeError("Could not find a clear misclassification.")
+
+
+def select_test_client(art: dict) -> int:
+    """Return the first test client (or a random one)."""
+    ids = np.asarray(art["test_ids"])
+    cid = int(ids[0])
+    print(f"  Test client: {cid}")
+    return cid
